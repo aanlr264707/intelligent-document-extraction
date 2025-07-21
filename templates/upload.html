@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Document - Intelligent Document Extraction{% endblock %}
+{% block page_title %}Upload Document{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-upload me-2"></i>
+                    Upload Document for Extraction
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <div class="mb-4">
+                        <label for="file" class="form-label">Select Document</label>
+                        <div class="upload-area border-2 border-dashed border-primary rounded p-4 text-center" 
+                             ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
+                            <input type="file" class="form-control d-none" id="file" name="file" 
+                                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.tiff,.bmp" required>
+                            <div id="uploadContent">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                <h5>Drag & Drop your document here</h5>
+                                <p class="text-muted">or <a href="#" onclick="document.getElementById('file').click();" class="text-primary">browse files</a></p>
+                                <small class="text-muted">
+                                    Supported formats: PDF, Word (.doc, .docx), Images (.png, .jpg, .jpeg, .tiff, .bmp)<br>
+                                    Maximum file size: 50MB
+                                </small>
+                            </div>
+                            <div id="fileInfo" class="d-none">
+                                <i class="fas fa-file fa-2x text-success mb-2"></i>
+                                <p class="mb-1"><strong id="fileName"></strong></p>
+                                <p class="text-muted mb-0"><span id="fileSize"></span> | <span id="fileType"></span></p>
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="clearFile()">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Supported Document Types
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                    <span>PDF Documents</span>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-file-word text-primary me-2"></i>
+                                    <span>Word Documents (.doc, .docx)</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-file-image text-success me-2"></i>
+                                    <span>Images (PNG, JPG, TIFF)</span>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-hand-paper text-warning me-2"></i>
+                                    <span>Handwritten Documents</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-magic me-2"></i>
+                            What We Can Extract
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Contract details</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Party names</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Dates & deadlines</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Financial amounts</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Legal clauses</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Tabular data</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Risk indicators</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Obligations</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Custom fields</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn" disabled>
+                            <i class="fas fa-upload me-2"></i>
+                            Upload & Continue to Extraction
+                        </button>
+                        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Progress Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Uploading Document...</h5>
+                <p class="text-muted mb-0">Please wait while we process your document.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// File upload handling
+document.getElementById('file').addEventListener('change', function(e) {
+    handleFileSelect(e.target.files[0]);
+});
+
+function handleFileSelect(file) {
+    if (file) {
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = formatFileSize(file.size);
+        document.getElementById('fileType').textContent = file.type || 'Unknown';
+        
+        document.getElementById('uploadContent').classList.add('d-none');
+        document.getElementById('fileInfo').classList.remove('d-none');
+        document.getElementById('uploadBtn').disabled = false;
+        
+        // Reset upload area styling
+        document.querySelector('.upload-area').classList.remove('border-success', 'bg-light');
+        document.querySelector('.upload-area').classList.add('border-primary');
+    }
+}
+
+function clearFile() {
+    document.getElementById('file').value = '';
+    document.getElementById('uploadContent').classList.remove('d-none');
+    document.getElementById('fileInfo').classList.add('d-none');
+    document.getElementById('uploadBtn').disabled = true;
+    
+    // Reset upload area styling
+    document.querySelector('.upload-area').classList.remove('border-success', 'bg-light');
+    document.querySelector('.upload-area').classList.add('border-primary');
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Drag and drop handling
+function dragOverHandler(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('border-success', 'bg-light');
+}
+
+function dragLeaveHandler(ev) {
+    ev.currentTarget.classList.remove('border-success', 'bg-light');
+}
+
+function dropHandler(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('border-success', 'bg-light');
+    
+    if (ev.dataTransfer.items) {
+        for (let i = 0; i < ev.dataTransfer.items.length; i++) {
+            if (ev.dataTransfer.items[i].kind === 'file') {
+                const file = ev.dataTransfer.items[i].getAsFile();
+                document.getElementById('file').files = ev.dataTransfer.files;
+                handleFileSelect(file);
+                break;
+            }
+        }
+    }
+}
+
+// Form submission handling
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
+    uploadModal.show();
+});
+</script>
+{% endblock %}

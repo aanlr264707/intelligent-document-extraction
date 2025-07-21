@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Trail - Intelligent Document Extraction{% endblock %}
+{% block page_title %}Audit Trail{% endblock %}
+
+{% block page_actions %}
+<a href="{{ url_for('main.export_audit') }}" class="btn btn-outline-primary">
+    <i class="fas fa-download me-2"></i>
+    Export CSV
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-history me-2"></i>
+            System Audit Log
+        </h6>
+    </div>
+    <div class="card-body">
+        {% if audit_logs.items %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>User</th>
+                        <th>Document</th>
+                        <th>Extraction</th>
+                        <th>Details</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in audit_logs.items %}
+                    <tr>
+                        <td>
+                            <div>{{ log.timestamp.strftime('%m/%d/%Y') }}</div>
+                            <small class="text-muted">{{ log.timestamp.strftime('%I:%M:%S %p') }}</small>
+                        </td>
+                        <td>
+                            {% set action_icons = {
+                                'document_upload': 'fas fa-upload text-primary',
+                                'extraction_request': 'fas fa-cogs text-info',
+                                'extraction_completed': 'fas fa-check-circle text-success',
+                                'extraction_failed': 'fas fa-times-circle text-danger',
+                                'user_feedback': 'fas fa-comment text-warning',
+                                'data_export': 'fas fa-download text-secondary',
+                                'manual_correction': 'fas fa-edit text-warning'
+                            } %}
+                            <i class="{{ action_icons.get(log.action.value, 'fas fa-info-circle text-muted') }} me-2"></i>
+                            {{ log.action.value.replace('_', ' ').title() }}
+                        </td>
+                        <td>
+                            {% if log.user_id %}
+                                <span class="badge bg-light text-dark">{{ log.user_id }}</span>
+                            {% else %}
+                                <span class="text-muted">System</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.document_id %}
+                                <a href="{{ url_for('main.extract_data', document_id=log.document_id) }}" class="text-decoration-none">
+                                    <span class="badge bg-primary">Doc #{{ log.document_id }}</span>
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.extraction_request_id %}
+                                <a href="{{ url_for('main.view_results', extraction_id=log.extraction_request_id) }}" class="text-decoration-none">
+                                    <span class="badge bg-info">Ext #{{ log.extraction_request_id }}</span>
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.details %}
+                                <button class="btn btn-sm btn-outline-secondary" onclick="showDetails('{{ log.details|e }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ log.ip_address or '-' }}</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if audit_logs.pages > 1 %}
+        <nav aria-label="Audit logs pagination">
+            <ul class="pagination justify-content-center">
+                {% if audit_logs.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('main.audit_trail', page=audit_logs.prev_num) }}">Previous</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in audit_logs.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != audit_logs.page %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.audit_trail', page=page_num) }}">{{ page_num }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if audit_logs.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('main.audit_trail', page=audit_logs.next_num) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <i class="fas fa-history fa-4x text-muted mb-4"></i>
+            <h4>No Audit Logs</h4>
+            <p class="text-muted">System activity will appear here as users interact with the application.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Audit Log Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="detailsContent" class="bg-light p-3 rounded"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showDetails(details) {
+    try {
+        const parsed = JSON.parse(details);
+        document.getElementById('detailsContent').textContent = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+        document.getElementById('detailsContent').textContent = details;
+    }
+    
+    const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+    detailsModal.show();
+}
+</script>
+{% endblock %}

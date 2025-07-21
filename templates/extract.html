@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Extract Data - Intelligent Document Extraction{% endblock %}
+{% block page_title %}Extract Data from {{ document.original_filename }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Document Info -->
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-file-alt me-2"></i>
+                    Document Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Filename:</strong>
+                    <p class="text-muted mb-1">{{ document.original_filename }}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Type:</strong>
+                    <span class="badge bg-secondary ms-2">{{ document.document_type.value.upper() }}</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Size:</strong>
+                    <p class="text-muted mb-1">{{ "%.1f KB"|format(document.file_size / 1024) }}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Uploaded:</strong>
+                    <p class="text-muted mb-1">{{ document.upload_timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Status:</strong>
+                    <span class="badge bg-{{ 'success' if document.processed else 'warning' }}">
+                        {{ 'Processed' if document.processed else 'Pending' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Examples -->
+        <div class="card shadow mt-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    Example Requests
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <button class="btn btn-outline-primary btn-sm w-100 text-start example-btn" 
+                            data-example="Extract the effective date, party names, and contract value from this agreement">
+                        Contract Basics
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <button class="btn btn-outline-primary btn-sm w-100 text-start example-btn" 
+                            data-example="Identify all termination clauses and penalty provisions in this contract">
+                        Legal Clauses
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <button class="btn btn-outline-primary btn-sm w-100 text-start example-btn" 
+                            data-example="Extract all tabular data including pricing tables and schedules">
+                        Tables & Data
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <button class="btn btn-outline-primary btn-sm w-100 text-start example-btn" 
+                            data-example="Find all payment obligations, due dates, and financial penalties">
+                        Financial Terms
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extraction Form -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-magic me-2"></i>
+                    Extraction Request
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="extractionForm">
+                    <div class="mb-4">
+                        <label for="requirements" class="form-label">
+                            <strong>What would you like to extract?</strong>
+                        </label>
+                        <textarea class="form-control" id="requirements" name="requirements" rows="4" 
+                                  placeholder="Describe in natural language what information you want to extract from this document. For example: 'Extract the effective date, party names, and payment terms from this contract'" required></textarea>
+                        <div class="form-text">
+                            Use natural language to describe what you want to extract. Our AI will understand your request and identify the relevant information.
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="outputFormat" class="form-label">Output Format</label>
+                            <select class="form-select" id="outputFormat" name="output_format">
+                                <option value="json" selected>JSON</option>
+                                <option value="csv">CSV</option>
+                                <option value="xml">XML</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Special Analysis</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="legalAnalysis" name="legal_analysis">
+                                <label class="form-check-label" for="legalAnalysis">
+                                    Legal Document Analysis
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="riskAnalysis" name="risk_analysis">
+                                <label class="form-check-label" for="riskAnalysis">
+                                    Risk Assessment
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-cogs me-2"></i>
+                            Start Extraction
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Previous Extractions -->
+        {% if extractions %}
+        <div class="card shadow mt-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-history me-2"></i>
+                    Previous Extractions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Request</th>
+                                <th>Status</th>
+                                <th>Confidence</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ext in extractions %}
+                            <tr>
+                                <td>
+                                    <span class="text-truncate d-block" style="max-width: 200px;" title="{{ ext.natural_language_request }}">
+                                        {{ ext.natural_language_request }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% set status_class = {
+                                        'completed': 'success',
+                                        'processing': 'info',
+                                        'pending': 'warning',
+                                        'failed': 'danger',
+                                        'flagged': 'warning'
+                                    } %}
+                                    <span class="badge bg-{{ status_class.get(ext.status.value, 'secondary') }}">
+                                        {{ ext.status.value.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if ext.confidence_score %}
+                                        <div class="confidence-bar">
+                                            <div class="confidence-fill bg-{{ 'success' if ext.confidence_score > 0.8 else 'warning' if ext.confidence_score > 0.6 else 'danger' }}" 
+                                                 style="width: {{ (ext.confidence_score * 100)|round }}%"></div>
+                                        </div>
+                                        <small class="text-muted">{{ (ext.confidence_score * 100)|round }}%</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ ext.created_timestamp.strftime('%m/%d %H:%M') }}</td>
+                                <td>
+                                    {% if ext.status.value == 'completed' %}
+                                        <a href="{{ url_for('main.view_results', extraction_id=ext.id) }}" class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    {% elif ext.status.value in ['pending', 'processing'] %}
+                                        <button class="btn btn-sm btn-outline-info" onclick="checkStatus({{ ext.id }})">
+                                            <i class="fas fa-sync"></i> Check
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Processing Modal -->
+<div class="modal fade" id="processingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Processing Document...</h5>
+                <p class="text-muted mb-0">Our AI is analyzing your document and extracting the requested information.</p>
+                <div class="mt-3">
+                    <small class="text-muted">This may take up to 30 seconds</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Example button handling
+document.querySelectorAll('.example-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.getElementById('requirements').value = this.dataset.example;
+    });
+});
+
+// Form submission
+document.getElementById('extractionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData();
+    formData.append('document_id', {{ document.id }});
+    formData.append('requirements', document.getElementById('requirements').value);
+    formData.append('output_format', document.getElementById('outputFormat').value);
+    
+    // Show processing modal
+    const processingModal = new bootstrap.Modal(document.getElementById('processingModal'));
+    processingModal.show();
+    
+    // Submit extraction request
+    fetch('/api/extract', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        processingModal.hide();
+        
+        if (data.success) {
+            // Poll for results
+            pollExtractionStatus(data.extraction_request.id);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        processingModal.hide();
+        alert('Error: ' + error.message);
+    });
+});
+
+function pollExtractionStatus(extractionId) {
+    const checkStatus = () => {
+        fetch(`/api/status/${extractionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const extraction = data.extraction;
+                
+                if (extraction.status === 'completed') {
+                    window.location.href = `/results/${extractionId}`;
+                } else if (extraction.status === 'failed') {
+                    alert('Extraction failed: ' + (extraction.error_message || 'Unknown error'));
+                } else {
+                    // Still processing, check again in 2 seconds
+                    setTimeout(checkStatus, 2000);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking status:', error);
+            setTimeout(checkStatus, 2000);
+        });
+    };
+    
+    checkStatus();
+}
+
+function checkStatus(extractionId) {
+    fetch(`/api/status/${extractionId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const extraction = data.extraction;
+            
+            if (extraction.status === 'completed') {
+                window.location.href = `/results/${extractionId}`;
+            } else {
+                alert(`Status: ${extraction.status}`);
+            }
+        }
+    })
+    .catch(error => {
+        alert('Error checking status: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

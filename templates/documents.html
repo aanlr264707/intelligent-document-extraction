@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Documents - Intelligent Document Extraction{% endblock %}
+{% block page_title %}Documents{% endblock %}
+
+{% block page_actions %}
+<a href="{{ url_for('main.upload_document') }}" class="btn btn-primary">
+    <i class="fas fa-upload me-2"></i>
+    Upload New Document
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-file-alt me-2"></i>
+            All Documents
+        </h6>
+    </div>
+    <div class="card-body">
+        {% if documents.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Uploaded</th>
+                        <th>Extractions</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documents.items %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file-{{ 'pdf' if doc.document_type.value == 'pdf' else 'word' if doc.document_type.value == 'word' else 'image' if doc.document_type.value == 'image' else 'alt' }} me-2 text-muted"></i>
+                                <div>
+                                    <div class="fw-bold">{{ doc.original_filename }}</div>
+                                    <small class="text-muted">ID: {{ doc.id }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ doc.document_type.value.upper() }}</span>
+                        </td>
+                        <td>{{ "%.1f KB"|format(doc.file_size / 1024) }}</td>
+                        <td>
+                            <div>{{ doc.upload_timestamp.strftime('%m/%d/%Y') }}</div>
+                            <small class="text-muted">{{ doc.upload_timestamp.strftime('%I:%M %p') }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ doc.extraction_requests|length }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if doc.processed else 'warning' }}">
+                                {{ 'Processed' if doc.processed else 'Pending' }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('main.extract_data', document_id=doc.id) }}" 
+                                   class="btn btn-outline-primary" title="Extract Data">
+                                    <i class="fas fa-magic"></i>
+                                </a>
+                                {% if doc.extraction_requests %}
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-secondary dropdown-toggle" 
+                                            data-bs-toggle="dropdown" title="View Results">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        {% for ext in doc.extraction_requests[:5] %}
+                                        <li>
+                                            <a class="dropdown-item" href="{{ url_for('main.view_results', extraction_id=ext.id) }}">
+                                                <span class="badge bg-{{ 'success' if ext.status.value == 'completed' else 'warning' }} me-2">
+                                                    {{ ext.status.value[:3].upper() }}
+                                                </span>
+                                                {{ ext.natural_language_request[:30] }}...
+                                            </a>
+                                        </li>
+                                        {% endfor %}
+                                        {% if doc.extraction_requests|length > 5 %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('main.list_extractions') }}?document_id={{ doc.id }}">View All</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if documents.pages > 1 %}
+        <nav aria-label="Documents pagination">
+            <ul class="pagination justify-content-center">
+                {% if documents.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('main.list_documents', page=documents.prev_num) }}">Previous</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in documents.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != documents.page %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('main.list_documents', page=page_num) }}">{{ page_num }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if documents.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('main.list_documents', page=documents.next_num) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <i class="fas fa-file-upload fa-4x text-muted mb-4"></i>
+            <h4>No Documents Yet</h4>
+            <p class="text-muted mb-4">Upload your first document to get started with intelligent extraction.</p>
+            <a href="{{ url_for('main.upload_document') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-upload me-2"></i>
+                Upload Document
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

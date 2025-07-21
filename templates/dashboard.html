@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Intelligent Document Extraction{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Statistics Cards -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Documents
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_documents }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-file-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Completed Extractions
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.completed_extractions }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Total Extractions
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_extractions }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-cogs fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Pending Extractions
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.pending_extractions }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Documents -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Documents</h6>
+                <a href="{{ url_for('main.list_documents') }}" class="btn btn-sm btn-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_documents %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Uploaded</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in recent_documents %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-file-{{ 'pdf' if doc.document_type.value == 'pdf' else 'alt' }} me-2 text-muted"></i>
+                                            <span class="text-truncate" style="max-width: 150px;" title="{{ doc.original_filename }}">
+                                                {{ doc.original_filename }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ doc.document_type.value.upper() }}</span>
+                                    </td>
+                                    <td>{{ "%.1f KB"|format(doc.file_size / 1024) }}</td>
+                                    <td>{{ doc.upload_timestamp.strftime('%m/%d %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('main.extract_data', document_id=doc.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-magic"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-file-upload fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No documents uploaded yet.</p>
+                        <a href="{{ url_for('main.upload_document') }}" class="btn btn-primary">Upload Your First Document</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Extractions -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Extractions</h6>
+                <a href="{{ url_for('main.list_extractions') }}" class="btn btn-sm btn-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_extractions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Request</th>
+                                    <th>Status</th>
+                                    <th>Confidence</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ext in recent_extractions %}
+                                <tr>
+                                    <td>
+                                        <span class="text-truncate d-block" style="max-width: 120px;" title="{{ ext.natural_language_request }}">
+                                            {{ ext.natural_language_request }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% set status_class = {
+                                            'completed': 'success',
+                                            'processing': 'info',
+                                            'pending': 'warning',
+                                            'failed': 'danger',
+                                            'flagged': 'warning'
+                                        } %}
+                                        <span class="badge bg-{{ status_class.get(ext.status.value, 'secondary') }}">
+                                            {{ ext.status.value.title() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if ext.confidence_score %}
+                                            <div class="confidence-bar">
+                                                <div class="confidence-fill bg-{{ 'success' if ext.confidence_score > 0.8 else 'warning' if ext.confidence_score > 0.6 else 'danger' }}" 
+                                                     style="width: {{ (ext.confidence_score * 100)|round }}%"></div>
+                                            </div>
+                                            <small class="text-muted">{{ (ext.confidence_score * 100)|round }}%</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ ext.created_timestamp.strftime('%m/%d %H:%M') }}</td>
+                                    <td>
+                                        {% if ext.status.value == 'completed' %}
+                                            <a href="{{ url_for('main.view_results', extraction_id=ext.id) }}" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No extractions performed yet.</p>
+                        <a href="{{ url_for('main.upload_document') }}" class="btn btn-primary">Start Extracting</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('main.upload_document') }}" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-upload fa-2x mb-2"></i>
+                            <br>Upload Document
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('main.list_documents') }}" class="btn btn-outline-primary btn-lg w-100">
+                            <i class="fas fa-file-alt fa-2x mb-2"></i>
+                            <br>Browse Documents
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('main.list_extractions') }}" class="btn btn-outline-primary btn-lg w-100">
+                            <i class="fas fa-cogs fa-2x mb-2"></i>
+                            <br>View Extractions
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('main.audit_trail') }}" class="btn btn-outline-primary btn-lg w-100">
+                            <i class="fas fa-history fa-2x mb-2"></i>
+                            <br>Audit Trail
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

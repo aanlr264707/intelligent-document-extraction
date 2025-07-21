@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+
+{% block title %}Extraction Results - Intelligent Document Extraction{% endblock %}
+{% block page_title %}Extraction Results{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{{ url_for('main.download_results', extraction_id=extraction.id, format='json') }}" class="btn btn-outline-primary">
+        <i class="fas fa-download me-1"></i> JSON
+    </a>
+    <a href="{{ url_for('main.download_results', extraction_id=extraction.id, format='csv') }}" class="btn btn-outline-primary">
+        <i class="fas fa-download me-1"></i> CSV
+    </a>
+    <a href="{{ url_for('main.download_results', extraction_id=extraction.id, format='xml') }}" class="btn btn-outline-primary">
+        <i class="fas fa-download me-1"></i> XML
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Extraction Summary -->
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Extraction Summary
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Document:</strong>
+                    <p class="text-muted mb-1">{{ document.original_filename }}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Request:</strong>
+                    <p class="text-muted mb-1">{{ extraction.natural_language_request }}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Status:</strong>
+                    {% set status_class = {
+                        'completed': 'success',
+                        'processing': 'info',
+                        'pending': 'warning',
+                        'failed': 'danger',
+                        'flagged': 'warning'
+                    } %}
+                    <span class="badge bg-{{ status_class.get(extraction.status.value, 'secondary') }}">
+                        {{ extraction.status.value.title() }}
+                    </span>
+                </div>
+                {% if extraction.confidence_score %}
+                <div class="mb-3">
+                    <strong>Confidence Score:</strong>
+                    <div class="confidence-bar mt-1">
+                        <div class="confidence-fill bg-{{ 'success' if extraction.confidence_score > 0.8 else 'warning' if extraction.confidence_score > 0.6 else 'danger' }}" 
+                             style="width: {{ (extraction.confidence_score * 100)|round }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ (extraction.confidence_score * 100)|round }}% confidence</small>
+                </div>
+                {% endif %}
+                {% if extraction.processing_time_seconds %}
+                <div class="mb-3">
+                    <strong>Processing Time:</strong>
+                    <p class="text-muted mb-1">{{ "%.2f"|format(extraction.processing_time_seconds) }} seconds</p>
+                </div>
+                {% endif %}
+                <div class="mb-3">
+                    <strong>Created:</strong>
+                    <p class="text-muted mb-1">{{ extraction.created_timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card shadow mt-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-tools me-2"></i>
+                    Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="showFeedbackModal()">
+                        <i class="fas fa-comment me-2"></i>
+                        Provide Feedback
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="showCorrectionModal()">
+                        <i class="fas fa-edit me-2"></i>
+                        Make Corrections
+                    </button>
+                    <a href="{{ url_for('main.extract_data', document_id=document.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo me-2"></i>
+                        New Extraction
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extracted Data -->
+    <div class="col-lg-8">
+        {% if extracted_data and 'error' not in extracted_data %}
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-database me-2"></i>
+                    Extracted Data
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Value</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, value in extracted_data.items() %}
+                                {% if key != 'tables' %}
+                                <tr>
+                                    <td><strong>{{ key.replace('_', ' ').title() }}</strong></td>
+                                    <td>
+                                        {% if value is string and value|length > 100 %}
+                                            <span class="text-truncate d-block" style="max-width: 300px;" title="{{ value }}">
+                                                {{ value }}
+                                            </span>
+                                        {% else %}
+                                            {{ value }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">
+                                            {{ value.__class__.__name__ }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tables -->
+        {% if extracted_data.tables %}
+        <div class="card shadow mt-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-table me-2"></i>
+                    Extracted Tables
+                </h6>
+            </div>
+            <div class="card-body">
+                {% for table in extracted_data.tables %}
+                <div class="mb-4">
+                    <h6>{{ table.title or 'Table ' + loop.index|string }}</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                            {% if table.headers %}
+                            <thead class="table-light">
+                                <tr>
+                                    {% for header in table.headers %}
+                                    <th>{{ header }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            {% endif %}
+                            <tbody>
+                                {% for row in table.rows %}
+                                <tr>
+                                    {% for cell in row %}
+                                    <td>{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Legal Analysis -->
+        {% if legal_analysis and 'error' not in legal_analysis %}
+        <div class="card shadow mt-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-gavel me-2"></i>
+                    Legal Analysis
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- Document Summary -->
+                {% if legal_analysis.summary %}
+                <div class="mb-4">
+                    <h6 class="text-primary">Document Summary</h6>
+                    <p class="text-muted">{{ legal_analysis.summary }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Identified Clauses -->
+                {% if legal_analysis.clauses %}
+                <div class="mb-4">
+                    <h6 class="text-primary">Identified Clauses</h6>
+                    <div class="row">
+                        {% for clause in legal_analysis.clauses %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-left-primary">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ clause.type.title() }} Clause</h6>
+                                    <p class="card-text small">{{ clause.text[:200] }}{% if clause.text|length > 200 %}...{% endif %}</p>
+                                    {% if clause.page_reference %}
+                                    <small class="text-muted">Page {{ clause.page_reference }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Risk Flags -->
+                {% if legal_analysis.risks %}
+                <div class="mb-4">
+                    <h6 class="text-primary">Risk Assessment</h6>
+                    {% for risk in legal_analysis.risks %}
+                    <div class="alert alert-{{ 'danger' if risk.level == 'high' else 'warning' if risk.level == 'medium' else 'info' }} alert-dismissible">
+                        <strong>{{ risk.level.title() }} Risk:</strong> {{ risk.description }}
+                        {% if risk.context %}
+                        <br><small class="text-muted">Context: {{ risk.context[:100] }}...</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Error State -->
+        <div class="card shadow">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                <h5>No Data Available</h5>
+                <p class="text-muted">
+                    {% if extraction.status.value == 'failed' %}
+                        The extraction failed: {{ extraction.error_message or 'Unknown error' }}
+                    {% elif extraction.status.value in ['pending', 'processing'] %}
+                        The extraction is still in progress. Please check back in a moment.
+                    {% else %}
+                        No extracted data is available for this request.
+                    {% endif %}
+                </p>
+                <a href="{{ url_for('main.extract_data', document_id=document.id) }}" class="btn btn-primary">
+                    Try Again
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Feedback Modal -->
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Provide Feedback</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="feedbackForm">
+                    <div class="mb-3">
+                        <label for="accuracy" class="form-label">Accuracy Rating</label>
+                        <select class="form-select" id="accuracy" name="accuracy" required>
+                            <option value="">Select rating...</option>
+                            <option value="5">Excellent (5/5)</option>
+                            <option value="4">Good (4/5)</option>
+                            <option value="3">Average (3/5)</option>
+                            <option value="2">Poor (2/5)</option>
+                            <option value="1">Very Poor (1/5)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comments" class="form-label">Comments</label>
+                        <textarea class="form-control" id="comments" name="comments" rows="3" 
+                                  placeholder="Please provide any additional feedback about the extraction quality..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="missing_fields" class="form-label">Missing Fields</label>
+                        <input type="text" class="form-control" id="missing_fields" name="missing_fields" 
+                               placeholder="List any important fields that were missed...">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Correction Modal -->
+<div class="modal fade" id="correctionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Make Corrections</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="correctionForm">
+                    <div class="mb-3">
+                        <label class="form-label">Correct the extracted values below:</label>
+                        <div id="correctionFields">
+                            {% if extracted_data and 'error' not in extracted_data %}
+                                {% for key, value in extracted_data.items() %}
+                                    {% if key != 'tables' %}
+                                    <div class="mb-2">
+                                        <label class="form-label small">{{ key.replace('_', ' ').title() }}</label>
+                                        <input type="text" class="form-control form-control-sm" 
+                                               name="field_{{ key }}" value="{{ value }}" data-field="{{ key }}">
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitCorrections()">Apply Corrections</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showFeedbackModal() {
+    const feedbackModal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+    feedbackModal.show();
+}
+
+function showCorrectionModal() {
+    const correctionModal = new bootstrap.Modal(document.getElementById('correctionModal'));
+    correctionModal.show();
+}
+
+function submitFeedback() {
+    const form = document.getElementById('feedbackForm');
+    const formData = new FormData(form);
+    
+    const feedbackData = {
+        accuracy: formData.get('accuracy'),
+        comments: formData.get('comments'),
+        missing_fields: formData.get('missing_fields')
+    };
+    
+    fetch(`/feedback/{{ extraction.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(feedbackData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Thank you for your feedback!');
+            bootstrap.Modal.getInstance(document.getElementById('feedbackModal')).hide();
+        } else {
+            alert('Error submitting feedback: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error submitting feedback: ' + error.message);
+    });
+}
+
+function submitCorrections() {
+    const form = document.getElementById('correctionForm');
+    const inputs = form.querySelectorAll('input[data-field]');
+    
+    const correctedFields = {};
+    inputs.forEach(input => {
+        correctedFields[input.dataset.field] = input.value;
+    });
+    
+    const correctionData = {
+        corrected_fields: correctedFields
+    };
+    
+    fetch(`/api/correct/{{ extraction.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(correctionData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Corrections applied successfully!');
+            location.reload();
+        } else {
+            alert('Error applying corrections: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error applying corrections: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

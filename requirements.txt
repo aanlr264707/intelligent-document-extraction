@@ -1,0 +1,54 @@
+# Core web framework
+flask==2.3.3
+flask-cors==4.0.0
+flask-sqlalchemy==3.0.5
+flask-migrate==4.0.5
+
+# Document processing
+PyPDF2==3.0.1
+python-docx==0.8.11
+Pillow==10.0.0
+pytesseract==0.3.10
+
+# AI and ML libraries (temporarily commented out for initial setup)
+# openai==1.6.1
+# transformers==4.33.2
+# torch==2.2.0
+# torchvision==0.17.0
+# sentence-transformers==2.2.2
+# langchain==0.0.292
+# langchain-openai==0.0.1
+
+# Vision and OCR
+opencv-python==4.8.1.78
+easyocr==1.7.0
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.0
+openpyxl==3.1.2
+
+# Database
+sqlalchemy==2.0.21
+alembic==1.12.0
+
+# API and utilities
+requests==2.31.0
+python-dotenv==1.0.0
+celery==5.3.6
+redis==4.6.0
+
+# Testing
+pytest==7.4.2
+pytest-flask==1.2.0
+pytest-mock==3.11.1
+
+# Security
+cryptography==41.0.4
+bcrypt==4.0.1
+
+# Logging and monitoring
+structlog==23.1.0
+
+# File handling
+python-magic==0.4.27
