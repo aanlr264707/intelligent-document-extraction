@@ -19,9 +19,9 @@ pytesseract==0.3.10
 # langchain==0.0.292
 # langchain-openai==0.0.1
 
-# Vision and OCR
-opencv-python==4.8.1.78
-easyocr==1.7.0
+# Vision and OCR (simplified for Python 3.13 compatibility)
+# opencv-python==4.8.1.78  # Commented out - requires older Python
+# easyocr==1.7.0  # Commented out - requires torch which doesn't support Python 3.13
 
 # Data processing
 pandas==2.2.0
@@ -35,8 +35,8 @@ alembic==1.12.0
 # API and utilities
 requests==2.31.0
 python-dotenv==1.0.1
-celery==5.3.6
-redis==4.6.0
+# celery==5.3.6  # Commented out - not essential for basic functionality
+# redis==4.6.0  # Commented out - not essential for basic functionality
 
 # Testing
 pytest==7.4.2
