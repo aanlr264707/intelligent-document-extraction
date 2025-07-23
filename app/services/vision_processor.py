@@ -3,17 +3,25 @@ import cv2
 import numpy as np
 from PIL import Image
 import pytesseract
-import easyocr
 from typing import Dict, List, Any, Tuple
 import json
+
+try:
+    import easyocr
+    EASYOCR_AVAILABLE = True
+except ImportError:
+    EASYOCR_AVAILABLE = False
 
 class VisionProcessor:
     """Handles multi-modal analysis of documents using Vision Language Models"""
     
     def __init__(self):
-        try:
-            self.easyocr_reader = easyocr.Reader(['en'])
-        except:
+        if EASYOCR_AVAILABLE:
+            try:
+                self.easyocr_reader = easyocr.Reader(['en'])
+            except:
+                self.easyocr_reader = None
+        else:
             self.easyocr_reader = None
         
         self.tesseract_config = '--oem 3 --psm 6'
