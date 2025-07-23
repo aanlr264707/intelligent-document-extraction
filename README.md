@@ -28,12 +28,38 @@ The system consists of several key components:
 
 ## Installation
 
+### Prerequisites
+
+**For macOS users:**
+```bash
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install required system dependencies
+brew install libmagic
+```
+
+**For Linux users:**
+```bash
+# Ubuntu/Debian
+sudo apt-get install libmagic1
+
+# CentOS/RHEL
+sudo yum install file-libs
+```
+
+### Setup
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd intelligent-document-extraction
 
-# Install dependencies
+# Create and activate virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install Python dependencies
 pip install -r requirements.txt
 
 # Set up environment variables
@@ -43,6 +69,13 @@ cp .env.example .env
 # Run the application
 python app.py
 ```
+
+### Troubleshooting
+
+**ImportError: failed to find libmagic**
+- **macOS**: Install libmagic using `brew install libmagic`
+- **Linux**: Install libmagic1 using your package manager
+- **Windows**: libmagic is included with python-magic-bin package
 
 ## Usage
 
