@@ -20,7 +20,7 @@ openai==1.6.1
 # langchain-openai==0.0.1  # Commented out - requires langchain
 
 # Vision and OCR (simplified for Python 3.13 compatibility)
-# opencv-python==4.8.1.78  # Commented out - requires older Python
+opencv-python==4.8.1.78
 # easyocr==1.7.0  # Commented out - requires torch which doesn't support Python 3.13
 
 # Data processing
