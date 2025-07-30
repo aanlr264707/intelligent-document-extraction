@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from PIL import Image
 import pytesseract
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 import json
 
 try:
@@ -12,29 +12,64 @@ try:
 except ImportError:
     EASYOCR_AVAILABLE = False
 
+try:
+    import paddleocr
+    PADDLEOCR_AVAILABLE = True
+except ImportError:
+    PADDLEOCR_AVAILABLE = False
+
+try:
+    import layoutparser as lp
+    LAYOUTPARSER_AVAILABLE = True
+except ImportError:
+    LAYOUTPARSER_AVAILABLE = False
+
 class VisionProcessor:
     """Handles multi-modal analysis of documents using Vision Language Models"""
     
     def __init__(self):
+        self.easyocr_reader = None
+        self.paddleocr_reader = None
+        self.layout_model = None
+        self.clip_model = None
+        self.clip_preprocess = None
+        
         if EASYOCR_AVAILABLE:
             try:
                 self.easyocr_reader = easyocr.Reader(['en'])
-            except:
-                self.easyocr_reader = None
-        else:
-            self.easyocr_reader = None
+                print("EasyOCR initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize EasyOCR: {e}")
+        
+        if PADDLEOCR_AVAILABLE:
+            try:
+                self.paddleocr_reader = paddleocr.PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
+                print("PaddleOCR initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize PaddleOCR: {e}")
+        
+        if LAYOUTPARSER_AVAILABLE:
+            try:
+                self.layout_model = lp.Detectron2LayoutModel(
+                    'lp://PubLayNet/faster_rcnn_R_50_FPN_3x/config',
+                    extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                    label_map={0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"}
+                )
+                print("Layout analysis model initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize layout model: {e}")
         
         self.tesseract_config = '--oem 3 --psm 6'
         
-        self.clip_model = None
         try:
             import clip
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
             self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=device)
             self.clip_device = device
-        except:
-            pass
+            print("CLIP model initialized successfully")
+        except Exception as e:
+            print(f"Failed to initialize CLIP: {e}")
     
     def analyze_document(self, file_path: str) -> Dict[str, Any]:
         """Perform comprehensive visual analysis of a document"""
@@ -44,21 +79,38 @@ class VisionProcessor:
             if image is None:
                 return {'error': 'Could not load image'}
             
-            analysis_result = {
-                'ocr_text': self._extract_text_with_ocr(image),
-                'layout_analysis': self._analyze_layout(image),
-                'table_detection': self._detect_tables(image),
-                'visual_elements': self._detect_visual_elements(image),
-                'handwriting_detection': self._detect_handwriting(image),
-                'quality_assessment': self._assess_image_quality(image)
-            }
+            ocr_result = self._extract_text_with_ocr(image)
+            layout_info = self._analyze_layout(image)
+            table_info = self._detect_tables(image)
+            visual_elements = self._detect_visual_elements(image)
+            handwriting_info = self._detect_handwriting(image)
+            quality_info = self._assess_image_quality(image)
             
-            return analysis_result
+            ocr_engines_used = ['tesseract']
+            if self.easyocr_reader:
+                ocr_engines_used.append('easyocr')
+            if self.paddleocr_reader:
+                ocr_engines_used.append('paddleocr')
+            
+            return {
+                'text_content': ocr_result.get('combined_text', ''),
+                'layout_analysis': layout_info,
+                'table_detection': table_info,
+                'visual_elements': visual_elements,
+                'handwriting_detection': handwriting_info,
+                'quality_assessment': quality_info,
+                'metadata': {
+                    'processing_method': 'vision_analysis',
+                    'ocr_engines_used': ocr_engines_used,
+                    'layout_analysis_available': self.layout_model is not None,
+                    'image_dimensions': image.shape[:2] if image is not None else None
+                }
+            }
             
         except Exception as e:
             return {'error': f'Vision processing failed: {str(e)}'}
     
-    def _load_image(self, file_path: str) -> np.ndarray:
+    def _load_image(self, file_path: str) -> Optional[np.ndarray]:
         """Load image from file path"""
         
         if file_path.lower().endswith('.pdf'):
@@ -69,7 +121,7 @@ class VisionProcessor:
                 return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             return None
     
-    def _pdf_to_image(self, pdf_path: str) -> np.ndarray:
+    def _pdf_to_image(self, pdf_path: str) -> Optional[np.ndarray]:
         """Convert first page of PDF to image"""
         
         try:
@@ -126,6 +178,21 @@ class VisionProcessor:
             except Exception as e:
                 ocr_results['easyocr'] = {'error': str(e)}
         
+        if self.paddleocr_reader:
+            try:
+                paddleocr_results = self.paddleocr_reader.ocr(image, cls=True)
+                if paddleocr_results and paddleocr_results[0]:
+                    paddleocr_text = ' '.join([line[1][0] for line in paddleocr_results[0] if line[1][0].strip()])
+                    paddleocr_confidence = np.mean([line[1][1] for line in paddleocr_results[0]])
+                    
+                    ocr_results['paddleocr'] = {
+                        'text': paddleocr_text,
+                        'confidence': paddleocr_confidence,
+                        'word_count': len(paddleocr_results[0])
+                    }
+            except Exception as e:
+                ocr_results['paddleocr'] = {'error': str(e)}
+        
         best_text = ""
         best_confidence = 0
         
@@ -141,7 +208,30 @@ class VisionProcessor:
         }
     
     def _analyze_layout(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze document layout and structure"""
+        """Analyze document layout and structure using LayoutParser"""
+        
+        if self.layout_model:
+            try:
+                layout = self.layout_model.detect(image)
+                
+                regions = []
+                for block in layout:
+                    regions.append({
+                        'type': block.type,
+                        'bbox': [block.block.x_1, block.block.y_1, block.block.x_2, block.block.y_2],
+                        'confidence': block.score
+                    })
+                
+                reading_order = sorted(regions, key=lambda x: (x['bbox'][1], x['bbox'][0]))
+                
+                return {
+                    'regions': regions,
+                    'reading_order': [i for i, _ in enumerate(reading_order)],
+                    'confidence': sum(r['confidence'] for r in regions) / len(regions) if regions else 0.0,
+                    'layout_analysis_available': True
+                }
+            except Exception as e:
+                print(f"Layout analysis failed: {e}")
         
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         
@@ -156,7 +246,8 @@ class VisionProcessor:
             'column_count': len(columns),
             'columns': columns,
             'headers_footers': headers_footers,
-            'layout_type': self._classify_layout(text_regions, columns)
+            'layout_type': self._classify_layout(text_regions, columns),
+            'layout_analysis_available': False
         }
     
     def _detect_text_regions(self, gray_image: np.ndarray) -> List[Dict]:

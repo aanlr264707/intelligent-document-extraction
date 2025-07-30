@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import pandas as pd
 from io import StringIO, BytesIO
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, Optional
 import os
 from datetime import datetime
 
@@ -16,7 +16,7 @@ class OutputGenerator:
         os.makedirs(output_dir, exist_ok=True)
     
     def generate_output(self, extracted_data: Dict[str, Any], 
-                       output_format: str, filename_prefix: str = None) -> Dict[str, Any]:
+                       output_format: str, filename_prefix: Optional[str] = None) -> Dict[str, Any]:
         """Generate output in the specified format"""
         
         if filename_prefix is None:
@@ -274,7 +274,7 @@ class OutputGenerator:
         return preview
     
     def generate_enterprise_format(self, data: Dict[str, Any], 
-                                 schema_mapping: Dict[str, str] = None) -> Dict[str, Any]:
+                                 schema_mapping: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Generate output formatted for enterprise system integration"""
         
         if schema_mapping:

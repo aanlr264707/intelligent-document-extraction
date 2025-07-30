@@ -2,12 +2,13 @@ import os
 import openai
 import json
 import re
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime
 from app.services.nlp_processor import NLPProcessor
 from app.services.vision_processor import VisionProcessor
 from app.services.legal_processor import LegalProcessor
 from app.services.document_processor import DocumentProcessor
+from app.services.advanced_nlp import AdvancedNLPProcessor
 
 class ExtractionEngine:
     """Core extraction engine that orchestrates the document extraction process"""
@@ -21,6 +22,7 @@ class ExtractionEngine:
         self.vision_processor = VisionProcessor()
         self.legal_processor = LegalProcessor()
         self.document_processor = DocumentProcessor()
+        self.advanced_nlp = AdvancedNLPProcessor()
         
         self.confidence_threshold = 0.7
         self.flag_threshold = 0.5
@@ -38,9 +40,10 @@ class ExtractionEngine:
             
             text_content = self.document_processor.extract_text_content(document)
             
-            visual_data = None
+            visual_data = {}
             if document.document_type.value in ['image', 'pdf']:
-                visual_data = self.vision_processor.analyze_document(document.file_path)
+                visual_result = self.vision_processor.analyze_document(document.file_path)
+                visual_data = visual_result if visual_result is not None else {}
             
             extraction_result = self._perform_extraction(
                 text_content, visual_data, parsed_request, document
@@ -54,8 +57,16 @@ class ExtractionEngine:
             
             processing_time = (datetime.utcnow() - start_time).total_seconds()
             
+            extracted_data = extraction_result['data']
+            
+            if self.advanced_nlp.models_loaded and text_content:
+                extracted_data = self.advanced_nlp.enhance_extraction_results(
+                    text_content, 
+                    extracted_data
+                )
+            
             result = {
-                'extracted_data': extraction_result['data'],
+                'extracted_data': extracted_data,
                 'confidence_score': extraction_result['confidence'],
                 'flagged_fields': extraction_result['flagged_fields'],
                 'processing_time_seconds': processing_time,
@@ -64,7 +75,7 @@ class ExtractionEngine:
                     'document_type': document.document_type.value,
                     'extraction_method': extraction_result['method'],
                     'fields_requested': len(parsed_request.get('fields', [])),
-                    'fields_extracted': len(extraction_result['data'])
+                    'fields_extracted': len(extracted_data)
                 }
             }
             
@@ -195,7 +206,7 @@ class ExtractionEngine:
         
         return self._format_extraction_result(result, 'local_patterns')
     
-    def _extract_field_with_patterns(self, text: str, field_name: str, field_type: str) -> Tuple[str, float]:
+    def _extract_field_with_patterns(self, text: str, field_name: str, field_type: str) -> Tuple[Optional[str], float]:
         """Extract a specific field using pattern matching"""
         
         patterns = {

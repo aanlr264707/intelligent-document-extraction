@@ -2,7 +2,7 @@ import os
 import openai
 import json
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 class NLPProcessor:
     """Processes natural language extraction requests and interprets user requirements"""
@@ -14,7 +14,7 @@ class NLPProcessor:
         
         self.intent_classifier = None
     
-    def parse_extraction_request(self, natural_language_request: str, document_type: str = None) -> Dict[str, Any]:
+    def parse_extraction_request(self, natural_language_request: str, document_type: Optional[str] = None) -> Dict[str, Any]:
         """Parse natural language request into structured extraction requirements"""
         
         if self.openai_api_key:
@@ -22,7 +22,7 @@ class NLPProcessor:
         else:
             return self._parse_with_local_models(natural_language_request, document_type)
     
-    def _parse_with_openai(self, request: str, document_type: str = None) -> Dict[str, Any]:
+    def _parse_with_openai(self, request: str, document_type: Optional[str] = None) -> Dict[str, Any]:
         """Parse using OpenAI GPT models"""
         
         system_prompt = """You are an AI assistant that parses natural language extraction requests for document processing.
@@ -66,7 +66,7 @@ class NLPProcessor:
             print(f"OpenAI parsing failed: {e}")
             return self._parse_with_local_models(request, document_type)
     
-    def _parse_with_local_models(self, request: str, document_type: str = None) -> Dict[str, Any]:
+    def _parse_with_local_models(self, request: str, document_type: Optional[str] = None) -> Dict[str, Any]:
         """Parse using local models and rule-based approach"""
         
         field_patterns = {
@@ -157,7 +157,7 @@ class NLPProcessor:
         
         return parsed_request
     
-    def generate_field_mapping(self, extracted_fields: List[str], user_schema: Dict[str, str] = None) -> Dict[str, str]:
+    def generate_field_mapping(self, extracted_fields: List[str], user_schema: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         """Generate dynamic field mapping between extracted fields and user schema"""
         
         if not user_schema:
@@ -174,7 +174,7 @@ class NLPProcessor:
         
         return mapping
     
-    def _find_best_field_match(self, field: str, schema_fields: List[str]) -> str:
+    def _find_best_field_match(self, field: str, schema_fields: List[str]) -> Optional[str]:
         """Find the best matching field in user schema"""
         
         field_lower = field.lower()
