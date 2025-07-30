@@ -33,6 +33,8 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     
+    from app.models import Document, ExtractionRequest, AuditLog
+    
     if CACHING_AVAILABLE and cache:
         cache.init_app(app, config={
             'CACHE_TYPE': 'redis',
