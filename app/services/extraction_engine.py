@@ -153,7 +153,8 @@ class ExtractionEngine:
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.1,
-                max_tokens=2000
+                max_tokens=2000,
+                timeout=25
             )
             
             result = json.loads(response.choices[0].message.content)

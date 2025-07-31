@@ -1,12 +1,12 @@
 from app.celery_app import celery
 from app import create_app, db
 from app.models.document import Document
-from app.models.extraction_request import ExtractionRequest
+from app.models.extraction_request import ExtractionRequest, ExtractionStatus
 from app.services.extraction_engine import ExtractionEngine
 from app.services.advanced_nlp import AdvancedNLPProcessor
 import json
 
-@celery.task(bind=True)
+@celery.task(bind=True, time_limit=30, soft_time_limit=25)
 def async_document_extraction(self, document_id, extraction_request_id):
     """Perform document extraction asynchronously"""
     
@@ -29,7 +29,7 @@ def async_document_extraction(self, document_id, extraction_request_id):
             
             self.update_state(state='PROGRESS', meta={'status': 'Processing document'})
             
-            result = extraction_engine.extract_data(document, extraction_request.request_data)
+            result = extraction_engine.extract_data(document, extraction_request.natural_language_request)
             
             if advanced_nlp.models_loaded:
                 self.update_state(state='PROGRESS', meta={'status': 'Enhancing with advanced NLP'})
@@ -41,8 +41,8 @@ def async_document_extraction(self, document_id, extraction_request_id):
                         result.get('extracted_data', {})
                     )
             
-            extraction_request.status = 'completed'
-            extraction_request.result_data = result
+            extraction_request.status = ExtractionStatus.COMPLETED
+            extraction_request.extracted_data = json.dumps(result)
             db.session.commit()
             
             return {
@@ -53,7 +53,7 @@ def async_document_extraction(self, document_id, extraction_request_id):
             }
             
         except Exception as e:
-            extraction_request.status = 'failed'
+            extraction_request.status = ExtractionStatus.FAILED
             extraction_request.error_message = str(e)
             db.session.commit()
             

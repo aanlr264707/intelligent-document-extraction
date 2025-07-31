@@ -11,9 +11,22 @@ from datetime import datetime
 class OutputGenerator:
     """Generates structured output in various formats (JSON, CSV, XML)"""
     
-    def __init__(self, output_dir='static/outputs'):
-        self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
+    def __init__(self, output_dir=None):
+        if output_dir is None:
+            from flask import current_app
+            try:
+                app_root = current_app.root_path
+                self.output_dir = os.path.join(os.path.dirname(app_root), 'static', 'outputs')
+            except RuntimeError:
+                self.output_dir = os.path.abspath('static/outputs')
+        else:
+            self.output_dir = output_dir
+        
+        os.makedirs(self.output_dir, exist_ok=True)
+        try:
+            os.chmod(self.output_dir, 0o755)
+        except OSError:
+            pass  # Ignore permission errors in restricted environments
     
     def generate_output(self, extracted_data: Dict[str, Any], 
                        output_format: str, filename_prefix: Optional[str] = None) -> Dict[str, Any]:
