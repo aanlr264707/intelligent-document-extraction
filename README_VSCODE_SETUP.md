@@ -126,9 +126,54 @@ TESSERACT_PATH=/usr/bin/tesseract
 MAX_DOCUMENT_SIZE_MB=50
 PROCESSING_TIMEOUT_SECONDS=60
 MAX_CONCURRENT_EXTRACTIONS=5
+
+# Redis/Celery Configuration (Optional - for background processing)
+REDIS_URL=redis://localhost:6379/0
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+CELERY_ACCEPT_CONTENT=['json']
+CELERY_TASK_SERIALIZER=json
+CELERY_RESULT_SERIALIZER=json
+CELERY_TIMEZONE=UTC
+CELERY_ENABLE_UTC=True
+CELERYD_TASK_SOFT_TIME_LIMIT=110
+CELERYD_TASK_TIME_LIMIT=120
 ```
 
 **Note:** You can leave API keys empty - the application will fall back to local models.
+
+### Background Processing Options
+
+The application supports two approaches for background processing:
+
+1. **Threading (Default)**: Uses Python threading for extraction tasks. No additional setup required.
+2. **Celery (Optional)**: Uses Redis and Celery for distributed task processing. Better for production environments.
+
+#### To use Celery instead of threading:
+
+**Install Redis:**
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install redis-server
+
+# macOS (with Homebrew)
+brew install redis
+
+# Start Redis service
+sudo systemctl start redis-server  # Linux
+brew services start redis          # macOS
+```
+
+**Start Celery Worker:**
+```bash
+# In a separate terminal, with virtual environment activated
+celery -A app.celery_app worker --loglevel=info
+```
+
+**Configure the application:**
+- Ensure all Celery configuration variables are set in your `.env` file
+- The application will automatically detect and use Celery if properly configured
 
 ## Step 8: Install System Dependencies
 
