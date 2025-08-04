@@ -59,3 +59,7 @@ paddlepaddle==3.0.0
 paddleocr==2.7.0.3
 # clip-by-openai==1.0.1  # Removed due to torch version conflict
 flask-caching==2.1.0
+
+# RAG (Retrieval-Augmented Generation) dependencies
+faiss-cpu==1.7.4
+chromadb==0.4.15

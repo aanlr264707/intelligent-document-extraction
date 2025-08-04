@@ -9,6 +9,7 @@ from app.services.vision_processor import VisionProcessor
 from app.services.legal_processor import LegalProcessor
 from app.services.document_processor import DocumentProcessor
 from app.services.advanced_nlp import AdvancedNLPProcessor
+from app.services.rag_processor import RAGProcessor
 
 class ExtractionEngine:
     """Core extraction engine that orchestrates the document extraction process"""
@@ -33,6 +34,7 @@ class ExtractionEngine:
         self.legal_processor = LegalProcessor()
         self.document_processor = DocumentProcessor()
         self.advanced_nlp = AdvancedNLPProcessor()
+        self.rag_processor = RAGProcessor()
         
         self.confidence_threshold = 0.7
         self.flag_threshold = 0.5
@@ -159,6 +161,18 @@ class ExtractionEngine:
                 }
             }
             
+            if hasattr(self, 'rag_processor') and self.rag_processor and result.get('confidence_score', 0) > 0.5:
+                try:
+                    document_id = str(document.id) if hasattr(document, 'id') else f"doc_{hash(text_content[:100])}"
+                    self.rag_processor.add_document_to_knowledge_base(
+                        document_text=text_content,
+                        document_id=document_id,
+                        extraction_data=result.get('extracted_data', {})
+                    )
+                    print(f"[RAG DEBUG] Added document {document_id} to knowledge base")
+                except Exception as e:
+                    print(f"[RAG DEBUG] Failed to add document to knowledge base: {e}")
+            
             print(f"Extraction completed successfully with confidence: {result['confidence_score']}")
             return result
             
@@ -202,10 +216,30 @@ class ExtractionEngine:
     
     def _extract_with_openai(self, text_content: str, visual_data: Dict, 
                            parsed_request: Dict, document) -> Dict[str, Any]:
-        """Extract data using OpenAI GPT models"""
+        """Extract data using OpenAI GPT models with RAG enhancement"""
         
         try:
             print(f"Making OpenAI API call...")
+            
+            rag_result = None
+            if hasattr(self, 'rag_processor') and self.rag_processor and self.rag_processor.openai_client:
+                print(f"[RAG DEBUG] Attempting RAG-enhanced extraction...")
+                try:
+                    fields_to_extract = [field['name'] for field in parsed_request.get('fields', [])]
+                    requirements_text = f"Extract: {', '.join(fields_to_extract)}. Special requirements: {', '.join(parsed_request.get('special_requirements', []))}"
+                    
+                    rag_result = self.rag_processor.generate_rag_response(
+                        query=requirements_text,
+                        document_text=text_content,
+                        extraction_requirements=requirements_text
+                    )
+                    if rag_result:
+                        print(f"[RAG DEBUG] RAG extraction successful with {rag_result.get('context_documents', 0)} context documents")
+                        return self._format_rag_result(rag_result)
+                    else:
+                        print(f"[RAG DEBUG] RAG extraction returned no result, falling back to regular OpenAI")
+                except Exception as e:
+                    print(f"[RAG DEBUG] RAG extraction failed: {e}, falling back to regular OpenAI")
             
             text_sample = text_content[:3000] if len(text_content) > 3000 else text_content
             fields_to_extract = [field['name'] for field in parsed_request.get('fields', [])]
@@ -567,4 +601,33 @@ class ExtractionEngine:
             'confidence': overall_confidence,
             'flagged_fields': flagged_items,
             'method': method
+        }
+    
+    def _format_rag_result(self, rag_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Format RAG extraction result into standard format"""
+        
+        extracted_fields = rag_result.get('extracted_fields', {})
+        overall_confidence = rag_result.get('overall_confidence', 0.0)
+        
+        data = {}
+        flagged_items = []
+        
+        for field_name, field_data in extracted_fields.items():
+            if isinstance(field_data, dict):
+                data[field_name] = field_data.get('value', field_data)
+                if field_data.get('confidence', 1.0) < self.flag_threshold:
+                    flagged_items.append(field_name)
+            else:
+                data[field_name] = field_data
+        
+        if rag_result.get('rag_insights'):
+            data['rag_insights'] = rag_result['rag_insights']
+        
+        return {
+            'data': data,
+            'confidence': overall_confidence,
+            'flagged_fields': flagged_items,
+            'method': 'rag_enhanced',
+            'context_documents': rag_result.get('context_documents', 0),
+            'rag_used': True
         }

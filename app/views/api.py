@@ -178,7 +178,18 @@ def extract_data():
                     else:
                         print(f"[EXTRACTION DEBUG] Processing successful result...")
                         thread_extraction_request.status = ExtractionStatus.COMPLETED
-                        thread_extraction_request.extracted_data = json.dumps(result.get('extracted_data', {}))
+                        
+                        def convert_numpy_types(obj):
+                            if hasattr(obj, 'item'):  # numpy scalar
+                                return obj.item()
+                            elif isinstance(obj, dict):
+                                return {k: convert_numpy_types(v) for k, v in obj.items()}
+                            elif isinstance(obj, list):
+                                return [convert_numpy_types(v) for v in obj]
+                            return obj
+                        
+                        extracted_data = result.get('extracted_data', {})
+                        thread_extraction_request.extracted_data = json.dumps(convert_numpy_types(extracted_data))
                         thread_extraction_request.confidence_score = result.get('confidence_score', 0.0)
                         thread_extraction_request.flagged_fields = json.dumps(result.get('flagged_fields', []))
                         
