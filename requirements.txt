@@ -11,7 +11,7 @@ Pillow==10.4.0
 pytesseract==0.3.10
 
 # AI and ML libraries
-openai==1.6.1
+openai>=1.10.0,<2.0.0
 transformers==4.21.3
 torch==2.2.0
 torchvision==0.17.0
