@@ -12,7 +12,7 @@ pytesseract==0.3.10
 
 # AI and ML libraries
 openai>=1.10.0,<2.0.0
-transformers==4.21.3
+transformers>=4.30.0
 torch==2.2.0
 torchvision==0.17.0
 sentence-transformers==2.2.2
