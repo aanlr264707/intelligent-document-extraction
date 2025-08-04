@@ -17,7 +17,7 @@ torch==2.2.0
 torchvision==0.17.0
 sentence-transformers==2.2.2
 langchain==0.0.292
-langchain-openai==0.0.1
+langchain-openai==0.1.0
 
 # Vision and OCR
 opencv-python==4.6.0.66

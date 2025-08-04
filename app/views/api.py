@@ -119,25 +119,64 @@ def extract_data():
         def process_extraction(doc_id, req_id):
             with app.app_context():
                 try:
-                    print(f"[THREAD DEBUG] Starting extraction for request {req_id}")
+                    print(f"[EXTRACTION DEBUG] Starting extraction for request {req_id}")
                     thread_extraction_request = ExtractionRequest.query.get(req_id)
                     thread_document = Document.query.get(doc_id)
+                    
+                    if not thread_extraction_request or not thread_document:
+                        print(f"[EXTRACTION DEBUG] Missing request or document: req={thread_extraction_request}, doc={thread_document}")
+                        return
                     
                     thread_extraction_request.status = ExtractionStatus.PROCESSING
                     thread_extraction_request.started_timestamp = datetime.utcnow()
                     db.session.commit()
-                    print(f"[THREAD DEBUG] Status updated to PROCESSING")
+                    print(f"[EXTRACTION DEBUG] Status updated to PROCESSING")
                     
-                    print(f"[THREAD DEBUG] Calling extraction engine...")
-                    result = extraction_engine.extract_data(thread_document, thread_extraction_request)
-                    print(f"[THREAD DEBUG] Extraction completed, result keys: {list(result.keys())}")
+                    print(f"[EXTRACTION DEBUG] Calling extraction engine...")
+                    
+                    import threading
+                    import queue
+                    
+                    result_queue = queue.Queue()
+                    exception_queue = queue.Queue()
+                    
+                    def extraction_worker():
+                        try:
+                            with app.app_context():
+                                result = extraction_engine.extract_data(thread_document, thread_extraction_request)
+                                result_queue.put(result)
+                        except Exception as e:
+                            exception_queue.put(e)
+                    
+                    worker_thread = threading.Thread(target=extraction_worker)
+                    worker_thread.daemon = True
+                    worker_thread.start()
+                    
+                    worker_thread.join(timeout=60)
+                    
+                    if worker_thread.is_alive():
+                        print(f"[EXTRACTION DEBUG] Extraction timed out after 60 seconds")
+                        result = {'error': 'Extraction timed out after 60 seconds'}
+                    elif not exception_queue.empty():
+                        exception = exception_queue.get()
+                        print(f"[EXTRACTION DEBUG] Extraction engine error: {exception}")
+                        result = {'error': f'Extraction failed: {str(exception)}'}
+                    elif not result_queue.empty():
+                        result = result_queue.get()
+                        print(f"[EXTRACTION DEBUG] Extraction completed, result keys: {list(result.keys()) if result else 'None'}")
+                    else:
+                        print(f"[EXTRACTION DEBUG] Extraction completed with no result")
+                        result = {'error': 'Extraction completed but returned no result'}
+                    
+                    if not result:
+                        result = {'error': 'Extraction returned no result'}
                     
                     if 'error' in result:
-                        print(f"[THREAD DEBUG] Error in result: {result['error']}")
+                        print(f"[EXTRACTION DEBUG] Error in result: {result['error']}")
                         thread_extraction_request.status = ExtractionStatus.FAILED
                         thread_extraction_request.error_message = result['error']
                     else:
-                        print(f"[THREAD DEBUG] Processing successful result...")
+                        print(f"[EXTRACTION DEBUG] Processing successful result...")
                         thread_extraction_request.status = ExtractionStatus.COMPLETED
                         thread_extraction_request.extracted_data = json.dumps(result.get('extracted_data', {}))
                         thread_extraction_request.confidence_score = result.get('confidence_score', 0.0)
@@ -145,20 +184,23 @@ def extract_data():
                         
                         if result.get('legal_analysis'):
                             legal_analysis = result['legal_analysis']
-                            thread_extraction_request.identified_clauses = json.dumps(legal_analysis.get('identified_clauses', []))
-                            thread_extraction_request.risk_flags = json.dumps(legal_analysis.get('risk_flags', []))
-                            thread_extraction_request.document_summary = legal_analysis.get('document_summary', '')
-                            thread_extraction_request.reference_materials = json.dumps(legal_analysis.get('reference_materials', {}))
+                            if isinstance(legal_analysis, dict):
+                                thread_extraction_request.identified_clauses = json.dumps(legal_analysis.get('identified_clauses', []))
+                                thread_extraction_request.risk_flags = json.dumps(legal_analysis.get('risk_flags', []))
+                                thread_extraction_request.document_summary = legal_analysis.get('document_summary', '')
+                                thread_extraction_request.reference_materials = json.dumps(legal_analysis.get('reference_materials', {}))
+                            else:
+                                thread_extraction_request.document_summary = str(legal_analysis)
                     
                     thread_extraction_request.completed_timestamp = datetime.utcnow()
                     thread_extraction_request.processing_time_seconds = result.get('processing_time_seconds', 0)
                     
-                    if thread_extraction_request.confidence_score and thread_extraction_request.confidence_score < 0.7:
+                    if thread_extraction_request.confidence_score and float(thread_extraction_request.confidence_score) < 0.7:
                         thread_extraction_request.status = ExtractionStatus.FLAGGED
                     
-                    print(f"[THREAD DEBUG] Committing final status: {thread_extraction_request.status}")
+                    print(f"[EXTRACTION DEBUG] Committing final status: {thread_extraction_request.status}")
                     db.session.commit()
-                    print(f"[THREAD DEBUG] Database commit successful")
+                    print(f"[EXTRACTION DEBUG] Database commit successful")
                     
                     audit_log = AuditLog(
                         action=AuditAction.EXTRACTION_COMPLETED if thread_extraction_request.status == ExtractionStatus.COMPLETED else AuditAction.EXTRACTION_FAILED,
@@ -172,32 +214,39 @@ def extract_data():
                     )
                     db.session.add(audit_log)
                     db.session.commit()
-                    print(f"[THREAD DEBUG] Audit log committed, extraction complete")
+                    print(f"[EXTRACTION DEBUG] Audit log committed, extraction complete")
                     
                 except Exception as e:
-                    print(f"[THREAD DEBUG] Exception in background thread: {e}")
+                    print(f"[EXTRACTION DEBUG] Exception in background thread: {e}")
                     import traceback
                     traceback.print_exc()
-                    thread_extraction_request = ExtractionRequest.query.get(req_id)
-                    thread_extraction_request.status = ExtractionStatus.FAILED
-                    thread_extraction_request.error_message = str(e)
-                    thread_extraction_request.completed_timestamp = datetime.utcnow()
-                    db.session.commit()
-                    
-                    audit_log = AuditLog(
-                        action=AuditAction.EXTRACTION_FAILED,
-                        document_id=doc_id,
-                        extraction_request_id=thread_extraction_request.id,
-                        details=json.dumps({'error': str(e)})
-                    )
-                    db.session.add(audit_log)
-                    db.session.commit()
+                    try:
+                        thread_extraction_request = ExtractionRequest.query.get(req_id)
+                        if thread_extraction_request:
+                            thread_extraction_request.status = ExtractionStatus.FAILED
+                            thread_extraction_request.error_message = str(e)
+                            thread_extraction_request.completed_timestamp = datetime.utcnow()
+                            db.session.commit()
+                            
+                            audit_log = AuditLog(
+                                action=AuditAction.EXTRACTION_FAILED,
+                                document_id=doc_id,
+                                extraction_request_id=thread_extraction_request.id,
+                                details=json.dumps({'error': str(e)})
+                            )
+                            db.session.add(audit_log)
+                            db.session.commit()
+                    except Exception as commit_error:
+                        print(f"[EXTRACTION DEBUG] Failed to update error status: {commit_error}")
         
         document_id_value = document.id
         extraction_request_id_value = extraction_request.id
         
         def process_extraction_wrapper():
-            process_extraction(document_id_value, extraction_request_id_value)
+            try:
+                process_extraction(document_id_value, extraction_request_id_value)
+            except Exception as e:
+                print(f"[EXTRACTION DEBUG] Wrapper exception: {e}")
         
         thread = threading.Thread(target=process_extraction_wrapper)
         thread.daemon = True
