@@ -27,6 +27,24 @@ class DocumentProcessor:
         self.upload_folder = upload_folder
         os.makedirs(upload_folder, exist_ok=True)
     
+    def validate_document(self, file_info):
+        """Validate document file information"""
+        filename = file_info.get('filename', '')
+        content_type = file_info.get('content_type', '')
+        size = file_info.get('size', 0)
+        
+        # Basic validation
+        if not filename:
+            return {'valid': False, 'error': 'No filename provided'}
+        
+        if not self.is_allowed_file(filename):
+            return {'valid': False, 'error': 'File type not allowed'}
+        
+        if size > 50 * 1024 * 1024:  # 50MB limit
+            return {'valid': False, 'error': 'File too large'}
+        
+        return {'valid': True, 'message': 'File validation passed'}
+    
     def is_allowed_file(self, filename):
         """Check if file extension is allowed"""
         return '.' in filename and \

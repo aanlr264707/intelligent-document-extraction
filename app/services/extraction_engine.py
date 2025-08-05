@@ -29,15 +29,52 @@ class ExtractionEngine:
         else:
             print("No valid OpenAI API key found, will use local models only")
         
-        self.nlp_processor = NLPProcessor()
-        self.vision_processor = VisionProcessor()
-        self.legal_processor = LegalProcessor()
-        self.document_processor = DocumentProcessor()
-        self.advanced_nlp = AdvancedNLPProcessor()
-        self.rag_processor = RAGProcessor()
+        # Lazy loading - initialize processors only when needed
+        self._nlp_processor = None
+        self._vision_processor = None
+        self._legal_processor = None
+        self._document_processor = None
+        self._advanced_nlp = None
+        self._rag_processor = None
         
         self.confidence_threshold = 0.7
         self.flag_threshold = 0.5
+    
+    @property
+    def nlp_processor(self):
+        if self._nlp_processor is None:
+            self._nlp_processor = NLPProcessor()
+        return self._nlp_processor
+    
+    @property
+    def vision_processor(self):
+        if self._vision_processor is None:
+            self._vision_processor = VisionProcessor()
+        return self._vision_processor
+    
+    @property
+    def legal_processor(self):
+        if self._legal_processor is None:
+            self._legal_processor = LegalProcessor()
+        return self._legal_processor
+    
+    @property
+    def document_processor(self):
+        if self._document_processor is None:
+            self._document_processor = DocumentProcessor()
+        return self._document_processor
+    
+    @property
+    def advanced_nlp(self):
+        if self._advanced_nlp is None:
+            self._advanced_nlp = AdvancedNLPProcessor()
+        return self._advanced_nlp
+    
+    @property
+    def rag_processor(self):
+        if self._rag_processor is None:
+            self._rag_processor = RAGProcessor()
+        return self._rag_processor
     
     def extract_data(self, document, extraction_request) -> Dict[str, Any]:
         """Main extraction method that processes a document based on extraction request"""
@@ -631,3 +668,202 @@ class ExtractionEngine:
             'context_documents': rag_result.get('context_documents', 0),
             'rag_used': True
         }
+
+    def extract_with_open_source_models(self, document, extraction_request) -> Dict[str, Any]:
+        """Enhanced extraction using open-source models (Tesseract, Hugging Face, CLIP)"""
+        
+        start_time = datetime.utcnow()
+        
+        try:
+            print(f"Starting open-source extraction for document: {document.original_filename}")
+            
+            # Get the natural language request
+            natural_language_request = getattr(extraction_request, 'natural_language_request', '')
+            if not natural_language_request:
+                natural_language_request = getattr(extraction_request, 'request_data', {}).get('natural_language_request', '')
+            
+            # Step 1: Analyze extraction intent using Hugging Face transformers
+            intent_analysis = self.nlp_processor.analyze_extraction_intent(natural_language_request)
+            
+            # Step 2: Extract text content using enhanced Tesseract OCR
+            text_content = self.document_processor.extract_text_content(document.file_path)
+            
+            # Step 3: Vision analysis with CLIP for document understanding
+            vision_result = self.vision_processor.analyze_document(document.file_path)
+            
+            # Step 4: Extract semantic information using CLIP
+            semantic_analysis = None
+            if hasattr(self.vision_processor, 'extract_document_semantics'):
+                semantic_analysis = self.vision_processor.extract_document_semantics(
+                    self.vision_processor._load_image(document.file_path),
+                    natural_language_request
+                )
+            
+            # Step 5: Named Entity Recognition using Hugging Face
+            entity_extraction = self.nlp_processor.extract_entities_from_text(text_content)
+            
+            # Step 6: Generate questions based on extraction requirements
+            questions = self._generate_questions_from_requirements(intent_analysis, natural_language_request)
+            qa_results = self.nlp_processor.answer_document_questions(text_content, questions)
+            
+            # Step 7: Combine all results
+            extracted_data = self._combine_open_source_results(
+                text_content, intent_analysis, vision_result, 
+                semantic_analysis, entity_extraction, qa_results
+            )
+            
+            # Step 8: Quality assessment
+            quality_score = self._assess_extraction_quality(extracted_data, intent_analysis)
+            
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
+            return {
+                'extracted_data': extracted_data,
+                'confidence_score': quality_score,
+                'processing_time_seconds': processing_time,
+                'extraction_method': 'open_source_models',
+                'models_used': {
+                    'ocr': 'tesseract_enhanced',
+                    'nlp': 'huggingface_transformers',
+                    'vision': 'clip',
+                    'ner': 'bert_conll03'
+                },
+                'intent_analysis': intent_analysis,
+                'semantic_analysis': semantic_analysis,
+                'entity_extraction': entity_extraction,
+                'qa_results': qa_results,
+                'vision_analysis': vision_result
+            }
+            
+        except Exception as e:
+            print(f"Open-source extraction failed: {e}")
+            return {
+                'extracted_data': {'error': str(e)},
+                'confidence_score': 0.0,
+                'processing_time_seconds': (datetime.utcnow() - start_time).total_seconds(),
+                'extraction_method': 'failed'
+            }
+    
+    def _generate_questions_from_requirements(self, intent_analysis: Dict, natural_request: str) -> List[str]:
+        """Generate questions for QA based on extraction requirements"""
+        
+        questions = []
+        
+        # Basic questions based on intent analysis
+        if intent_analysis.get('suggested_fields'):
+            for field in intent_analysis['suggested_fields']:
+                field_name = field.get('name', '')
+                if field_name:
+                    questions.append(f"What is the {field_name}?")
+                    questions.append(f"Where can I find the {field_name}?")
+        
+        # Questions based on categories
+        categories = intent_analysis.get('categories', {})
+        if categories.get('legal_document', 0) > 0:
+            questions.extend([
+                "Who are the parties involved in this agreement?",
+                "What is the effective date?",
+                "What are the key terms and conditions?",
+                "Are there any penalties or risks mentioned?"
+            ])
+        
+        if categories.get('financial_document', 0) > 0:
+            questions.extend([
+                "What is the total amount?",
+                "When is the payment due?",
+                "Who is the vendor or payer?",
+                "What items or services are listed?"
+            ])
+        
+        if categories.get('personal_document', 0) > 0:
+            questions.extend([
+                "What is the person's name?",
+                "What is the address?",
+                "What is the phone number?",
+                "What is the email address?"
+            ])
+        
+        # Add direct questions from natural language request
+        if 'what' in natural_request.lower() or 'who' in natural_request.lower():
+            questions.append(natural_request)
+        
+        return questions[:10]  # Limit to 10 questions to avoid overwhelming the QA model
+    
+    def _combine_open_source_results(self, text_content: str, intent_analysis: Dict, 
+                                   vision_result: Dict, semantic_analysis: Dict,
+                                   entity_extraction: Dict, qa_results: Dict) -> Dict[str, Any]:
+        """Combine results from all open-source models"""
+        
+        combined_data = {
+            'text_content': text_content,
+            'document_length': len(text_content),
+            'extraction_timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Add entities as structured data
+        if entity_extraction.get('entity_groups'):
+            combined_data['entities'] = entity_extraction['entity_groups']
+        
+        # Add QA results as extracted fields
+        if qa_results.get('answers'):
+            combined_data['qa_extracted_fields'] = {}
+            for question, answer_data in qa_results['answers'].items():
+                if answer_data['confidence'] > 0.3:  # Only include confident answers
+                    field_key = question.lower().replace('what is the ', '').replace('?', '').replace(' ', '_')
+                    combined_data['qa_extracted_fields'][field_key] = {
+                        'value': answer_data['answer'],
+                        'confidence': answer_data['confidence'],
+                        'source_question': question
+                    }
+        
+        # Add vision analysis results
+        if vision_result:
+            combined_data['document_structure'] = vision_result.get('layout_analysis', {})
+            combined_data['visual_elements'] = vision_result.get('visual_elements', {})
+            combined_data['ocr_text'] = vision_result.get('text_content', '')
+        
+        # Add semantic understanding from CLIP
+        if semantic_analysis:
+            combined_data['document_type'] = semantic_analysis.get('document_type_prediction', 'unknown')
+            combined_data['semantic_confidence'] = semantic_analysis.get('confidence', 0.0)
+            combined_data['extraction_relevance'] = semantic_analysis.get('extraction_relevance', {})
+        
+        # Add suggested fields from intent analysis
+        if intent_analysis.get('suggested_fields'):
+            combined_data['suggested_extraction_fields'] = intent_analysis['suggested_fields']
+        
+        return combined_data
+    
+    def _assess_extraction_quality(self, extracted_data: Dict, intent_analysis: Dict) -> float:
+        """Assess the quality of the extraction using multiple criteria"""
+        
+        quality_factors = []
+        
+        # Text content availability
+        if extracted_data.get('text_content'):
+            quality_factors.append(0.8 if len(extracted_data['text_content']) > 100 else 0.4)
+        else:
+            quality_factors.append(0.1)
+        
+        # Entity extraction success
+        entities = extracted_data.get('entities', {})
+        if entities:
+            entity_score = min(0.9, len(entities) * 0.2)
+            quality_factors.append(entity_score)
+        else:
+            quality_factors.append(0.2)
+        
+        # QA results confidence
+        qa_fields = extracted_data.get('qa_extracted_fields', {})
+        if qa_fields:
+            avg_confidence = sum(field['confidence'] for field in qa_fields.values()) / len(qa_fields)
+            quality_factors.append(avg_confidence)
+        else:
+            quality_factors.append(0.3)
+        
+        # Semantic analysis confidence
+        semantic_confidence = extracted_data.get('semantic_confidence', 0.0)
+        quality_factors.append(semantic_confidence)
+        
+        # Overall quality score
+        return sum(quality_factors) / len(quality_factors) if quality_factors else 0.0

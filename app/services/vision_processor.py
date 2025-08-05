@@ -6,6 +6,14 @@ import pytesseract
 from typing import Dict, List, Any, Tuple, Optional
 import json
 
+# Configure Tesseract path from environment
+tesseract_path = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
+if tesseract_path and os.path.exists(tesseract_path):
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+    print(f"Tesseract configured at: {tesseract_path}")
+else:
+    print("Warning: Tesseract path not found, using system default")
+
 try:
     import easyocr
     EASYOCR_AVAILABLE = True
@@ -24,6 +32,16 @@ try:
 except ImportError:
     LAYOUTPARSER_AVAILABLE = False
 
+# Temporarily disable CLIP to prevent hanging
+CLIP_AVAILABLE = False
+print("CLIP disabled to prevent hanging - basic vision processing only")
+    
+try:
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+
 class VisionProcessor:
     """Handles multi-modal analysis of documents using Vision Language Models"""
     
@@ -33,6 +51,49 @@ class VisionProcessor:
         self.layout_model = None
         self.clip_model = None
         self.clip_preprocess = None
+        self.clip_device = None
+        self._clip_initialized = False
+        
+        # Enhanced Tesseract configurations for different document types
+        self.tesseract_configs = {
+            'default': '--oem 3 --psm 6',  # Default OCR Engine Mode and Page Segmentation Mode
+            'single_block': '--oem 3 --psm 6',  # Uniform block of text
+            'single_line': '--oem 3 --psm 7',   # Single text line
+            'single_word': '--oem 3 --psm 8',   # Single word
+            'table': '--oem 3 --psm 6 -c preserve_interword_spaces=1',  # Better for tables
+            'document': '--oem 3 --psm 3',      # Fully automatic page segmentation
+            'sparse': '--oem 3 --psm 11',       # Sparse text
+            'digits_only': '--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789',  # Numbers only
+            'legal': '--oem 3 --psm 6 -c preserve_interword_spaces=1 -c tessedit_write_images=false'  # Legal documents
+        }
+        
+        # Default config
+        self.tesseract_config = self.tesseract_configs['default']
+        
+        print("VisionProcessor initialized (models will load on demand)")
+    
+    def _initialize_clip_model(self):
+        """Lazy initialization of CLIP model"""
+        if self._clip_initialized:
+            return
+            
+        self._clip_initialized = True
+        if CLIP_AVAILABLE:
+            try:
+                import clip  # Import locally to avoid reference issues
+                import torch  # Import torch locally when needed
+                clip_model_name = os.getenv('CLIP_MODEL_NAME', 'ViT-B/32')
+                print(f"Loading CLIP model {clip_model_name}...")
+                self.clip_model, self.clip_preprocess = clip.load(clip_model_name)
+                self.clip_device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.clip_model = self.clip_model.to(self.clip_device)
+                print(f"CLIP model {clip_model_name} initialized successfully on {self.clip_device}")
+            except Exception as e:
+                print(f"Failed to initialize CLIP model: {e}")
+                self.clip_model = None
+                self.clip_preprocess = None
+        else:
+            print("CLIP not available, vision-language features disabled")
         
         if EASYOCR_AVAILABLE:
             try:
@@ -61,15 +122,19 @@ class VisionProcessor:
         
         self.tesseract_config = '--oem 3 --psm 6'
         
-        try:
-            import clip
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=device)
-            self.clip_device = device
-            print("CLIP model initialized successfully")
-        except Exception as e:
-            print(f"Failed to initialize CLIP: {e}")
+        # Only try to initialize CLIP if available
+        if CLIP_AVAILABLE:
+            try:
+                import clip
+                import torch
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=device)
+                self.clip_device = device
+                print("CLIP model initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize CLIP: {e}")
+        else:
+            print("CLIP disabled - skipping CLIP initialization")
     
     def analyze_document(self, file_path: str) -> Dict[str, Any]:
         """Perform comprehensive visual analysis of a document"""
@@ -487,3 +552,120 @@ class VisionProcessor:
             'quality_score': float(quality_score),
             'quality_rating': 'high' if quality_score > 70 else 'medium' if quality_score > 40 else 'low'
         }
+
+    def analyze_with_clip(self, image: np.ndarray, text_queries: List[str]) -> Dict[str, Any]:
+        """Use CLIP for vision-language understanding of documents"""
+        
+        # Lazy initialize CLIP model
+        self._initialize_clip_model()
+        
+        if not CLIP_AVAILABLE or self.clip_model is None:
+            return {'error': 'CLIP model not available'}
+        
+        try:
+            import clip  # Import locally to ensure availability
+            import torch  # Import torch locally when needed
+            
+            # Preprocess image for CLIP
+            pil_image = Image.fromarray(image)
+            image_input = self.clip_preprocess(pil_image).unsqueeze(0).to(self.clip_device)
+            
+            # Tokenize text queries
+            text_inputs = clip.tokenize(text_queries).to(self.clip_device)
+            
+            # Get embeddings
+            with torch.no_grad():
+                image_features = self.clip_model.encode_image(image_input)
+                text_features = self.clip_model.encode_text(text_inputs)
+                
+                # Calculate similarities
+                logits_per_image, logits_per_text = self.clip_model(image_input, text_inputs)
+                probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+            
+            # Create results
+            results = {}
+            for i, query in enumerate(text_queries):
+                results[query] = {
+                    'similarity_score': float(probs[0][i]),
+                    'confidence': 'high' if probs[0][i] > 0.3 else 'medium' if probs[0][i] > 0.1 else 'low'
+                }
+            
+            return {
+                'query_results': results,
+                'best_match': text_queries[np.argmax(probs[0])],
+                'best_score': float(np.max(probs[0])),
+                'image_embedding_shape': image_features.shape,
+                'text_embedding_shape': text_features.shape
+            }
+            
+        except Exception as e:
+            return {'error': f'CLIP analysis failed: {str(e)}'}
+    
+    def extract_document_semantics(self, image: np.ndarray, extraction_requirements: str) -> Dict[str, Any]:
+        """Extract semantic information based on natural language requirements"""
+        
+        # Common document analysis queries
+        base_queries = [
+            "a table with data",
+            "a form with fields to fill",
+            "a legal document with clauses",
+            "a contract with terms and conditions",
+            "a financial statement",
+            "an invoice or receipt",
+            "handwritten text",
+            "a signature",
+            "a chart or graph",
+            "typed text document"
+        ]
+        
+        # Add user-specific requirements
+        if extraction_requirements:
+            user_queries = [
+                f"document containing {extraction_requirements}",
+                f"text about {extraction_requirements}",
+                f"information related to {extraction_requirements}"
+            ]
+            all_queries = base_queries + user_queries
+        else:
+            all_queries = base_queries
+        
+        clip_results = self.analyze_with_clip(image, all_queries)
+        
+        return {
+            'semantic_analysis': clip_results,
+            'document_type_prediction': clip_results.get('best_match', 'unknown'),
+            'confidence': clip_results.get('best_score', 0.0),
+            'extraction_relevance': self._assess_extraction_relevance(clip_results, extraction_requirements)
+        }
+    
+    def _assess_extraction_relevance(self, clip_results: Dict[str, Any], requirements: str) -> Dict[str, Any]:
+        """Assess how relevant the document is for the extraction requirements"""
+        
+        if not requirements or 'query_results' not in clip_results:
+            return {'relevance_score': 0.5, 'assessment': 'unknown'}
+        
+        # Find scores for requirement-related queries
+        requirement_scores = []
+        for query, result in clip_results['query_results'].items():
+            if requirements.lower() in query.lower():
+                requirement_scores.append(result['similarity_score'])
+        
+        if requirement_scores:
+            avg_score = np.mean(requirement_scores)
+            max_score = max(requirement_scores)
+            
+            if max_score > 0.4:
+                assessment = 'highly_relevant'
+            elif max_score > 0.2:
+                assessment = 'moderately_relevant'
+            else:
+                assessment = 'low_relevance'
+            
+            return {
+                'relevance_score': float(avg_score),
+                'max_relevance_score': float(max_score),
+                'assessment': assessment,
+                'relevant_queries': len(requirement_scores)
+            }
+        
+        return {'relevance_score': 0.3, 'assessment': 'uncertain'}

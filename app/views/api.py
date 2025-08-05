@@ -6,17 +6,38 @@ from datetime import datetime
 from app.models.document import Document
 from app.models.extraction_request import ExtractionRequest, ExtractionStatus, OutputFormat
 from app.models.audit_log import AuditLog, AuditAction
-from app.services.document_processor import DocumentProcessor
-from app.services.extraction_engine import ExtractionEngine
-from app.services.output_generator import OutputGenerator
 from app import db
 import threading
 
 api_bp = Blueprint('api', __name__)
 
-document_processor = DocumentProcessor()
-extraction_engine = ExtractionEngine()
-output_generator = OutputGenerator()
+# Lazy initialization of services
+_document_processor = None
+_extraction_engine = None
+_output_generator = None
+
+def get_document_processor():
+    global _document_processor
+    if _document_processor is None:
+        from app.services.document_processor import DocumentProcessor
+        _document_processor = DocumentProcessor()
+    return _document_processor
+
+def get_extraction_engine():
+    global _extraction_engine
+    if _extraction_engine is None:
+        from app.services.extraction_engine import ExtractionEngine
+        _extraction_engine = ExtractionEngine()
+    return _extraction_engine
+
+def get_output_generator():
+    global _output_generator
+    if _output_generator is None:
+        from app.services.output_generator import OutputGenerator
+        # Initialize output generator with correct path
+        output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'outputs')
+        _output_generator = OutputGenerator(output_dir)
+    return _output_generator
 
 @api_bp.route('/upload', methods=['POST'])
 def upload_document():
@@ -29,8 +50,8 @@ def upload_document():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
         
-        file_info = document_processor.save_uploaded_file(file)
-        document = document_processor.create_document_record(file_info)
+        file_info = get_document_processor().save_uploaded_file(file)
+        document = get_document_processor().create_document_record(file_info)
         
         audit_log = AuditLog(
             action=AuditAction.DOCUMENT_UPLOAD,
@@ -67,8 +88,8 @@ def extract_data():
             if 'file' in request.files:
                 file = request.files['file']
                 if file and file.filename:
-                    file_info = document_processor.save_uploaded_file(file)
-                    document = document_processor.create_document_record(file_info)
+                    file_info = get_document_processor().save_uploaded_file(file)
+                    document = get_document_processor().create_document_record(file_info)
                     data['document_id'] = document.id
         
         if 'document_id' not in data:
@@ -143,7 +164,7 @@ def extract_data():
                     def extraction_worker():
                         try:
                             with app.app_context():
-                                result = extraction_engine.extract_data(thread_document, thread_extraction_request)
+                                result = get_extraction_engine().extract_data(thread_document, thread_extraction_request)
                                 result_queue.put(result)
                         except Exception as e:
                             exception_queue.put(e)
@@ -357,7 +378,7 @@ def download_extraction_results(extraction_id, format):
             }
         
         filename_prefix = f"extraction_{extraction.id}_{extraction.document.original_filename.rsplit('.', 1)[0]}"
-        result = output_generator.generate_output(output_data, format, filename_prefix)
+        result = get_output_generator().generate_output(output_data, format, filename_prefix)
         
         if result['success']:
             audit_log = AuditLog(

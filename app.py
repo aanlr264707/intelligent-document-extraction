@@ -4,8 +4,10 @@ from app.models import Document, ExtractionRequest, AuditLog
 
 app = create_app()
 
-with app.app_context():
-    db.create_all()
+# Database tables are managed by Flask-Migrate
+# Comment out db.create_all() to avoid conflicts with migrations
+# with app.app_context():
+#     db.create_all()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

@@ -1,0 +1,43 @@
+{
+  "extraction_metadata": {
+    "timestamp": "2025-08-04T23:01:37.673617",
+    "format": "json"
+  },
+  "extracted_fields": {
+    "effective date": "December 08, 2023",
+    "party name": "Hanishk Cherlamcherla, Krish Patel, & Abhi Ankireddy",
+    "rag_insights": "The extraction was successful based on the clear presentation of the effective date and party names in the document. The patterns identified in similar documents helped confirm the accuracy of the extraction.",
+    "advanced_nlp_used": true
+  },
+  "tables": [],
+  "legal_analysis": {
+    "identified_clauses": [],
+    "risk_flags": [],
+    "document_summary": "This appears to be a contractual agreement containing 7 clauses or sections.",
+    "reference_materials": {
+      "clause_index": [],
+      "obligation_summary": [
+        {
+          "type": "general",
+          "count": 5,
+          "examples": [
+            "abide by government\nregulations...",
+            "be unique and not in\nuse...",
+            "lodge tax returns on\nbusinesses..."
+          ]
+        }
+      ],
+      "key_terms_glossary": [
+        {
+          "term": "intellectual property",
+          "context": "ncourages creativity and innovation by\nsupporting intellectual property protection. Contract regulation and purchaser security regulations,\nimplemented by the ACCC, add to a fair and moral commercial center. In addition to serving as a\nframework that fosters trust and st",
+          "page_reference": 35
+        }
+      ],
+      "page_references": {}
+    }
+  },
+  "confidence_metrics": {
+    "overall_confidence": 0.925
+  }
+}
