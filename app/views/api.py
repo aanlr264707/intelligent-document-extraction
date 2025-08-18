@@ -26,8 +26,8 @@ def get_document_processor():
 def get_extraction_engine():
     global _extraction_engine
     if _extraction_engine is None:
-        from app.services.extraction_engine import ExtractionEngine
-        _extraction_engine = ExtractionEngine()
+        from app.services.extraction_engine_enhanced import EnhancedExtractionEngine
+        _extraction_engine = EnhancedExtractionEngine()
     return _extraction_engine
 
 def get_output_generator():
@@ -173,11 +173,13 @@ def extract_data():
                     worker_thread.daemon = True
                     worker_thread.start()
                     
-                    worker_thread.join(timeout=60)
+                    # Use configurable timeout from app config
+                    timeout = current_app.config.get('PROCESSING_TIMEOUT_SECONDS', 300)
+                    worker_thread.join(timeout=timeout)
                     
                     if worker_thread.is_alive():
-                        print(f"[EXTRACTION DEBUG] Extraction timed out after 60 seconds")
-                        result = {'error': 'Extraction timed out after 60 seconds'}
+                        print(f"[EXTRACTION DEBUG] Extraction timed out after {timeout} seconds")
+                        result = {'error': f'Extraction timed out after {timeout} seconds'}
                     elif not exception_queue.empty():
                         exception = exception_queue.get()
                         print(f"[EXTRACTION DEBUG] Extraction engine error: {exception}")
@@ -317,7 +319,7 @@ def get_extraction_results(extraction_id):
         if not extraction:
             return jsonify({'success': False, 'error': 'Extraction request not found'}), 404
         
-        if extraction.status != ExtractionStatus.COMPLETED:
+        if extraction.status not in [ExtractionStatus.COMPLETED, ExtractionStatus.FLAGGED]:
             return jsonify({
                 'success': False, 
                 'error': f'Extraction not completed. Status: {extraction.status.value}'
@@ -357,7 +359,7 @@ def download_extraction_results(extraction_id, format):
         if not extraction:
             return jsonify({'success': False, 'error': 'Extraction request not found'}), 404
         
-        if extraction.status != ExtractionStatus.COMPLETED:
+        if extraction.status not in [ExtractionStatus.COMPLETED, ExtractionStatus.FLAGGED]:
             return jsonify({
                 'success': False, 
                 'error': f'Extraction not completed. Status: {extraction.status.value}'

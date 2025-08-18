@@ -1,0 +1,58 @@
+Traceback (most recent call last):
+  File "/Users/kumar/intelligent-document-extraction/test_app.py", line 15, in <module>
+    app = create_app()
+  File "/Users/kumar/intelligent-document-extraction/app/__init__.py", line 89, in create_app
+    from app.views.enhanced_api import enhanced_api_bp
+  File "/Users/kumar/intelligent-document-extraction/app/views/enhanced_api.py", line 16, in <module>
+    from app.services.performance_monitor import performance_monitor
+  File "/Users/kumar/intelligent-document-extraction/app/services/__init__.py", line 2, in <module>
+    from .extraction_engine import ExtractionEngine
+  File "/Users/kumar/intelligent-document-extraction/app/services/extraction_engine.py", line 8, in <module>
+    from app.services.vision_processor import VisionProcessor
+  File "/Users/kumar/intelligent-document-extraction/app/services/vision_processor.py", line 18, in <module>
+    import easyocr
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/easyocr/__init__.py", line 1, in <module>
+    from .easyocr import Reader
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/easyocr/easyocr.py", line 3, in <module>
+    from .recognition import get_recognizer, get_text
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/easyocr/recognition.py", line 6, in <module>
+    import torchvision.transforms as transforms
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torchvision/__init__.py", line 6, in <module>
+    from torchvision import _meta_registrations, datasets, io, models, ops, transforms, utils
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torchvision/models/__init__.py", line 2, in <module>
+    from .convnext import *
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torchvision/models/convnext.py", line 8, in <module>
+    from ..ops.misc import Conv2dNormActivation, Permute
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torchvision/ops/__init__.py", line 1, in <module>
+    from ._register_onnx_ops import _register_custom_op
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torchvision/ops/_register_onnx_ops.py", line 5, in <module>
+    from torch.onnx import symbolic_opset11 as opset11
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torch/onnx/__init__.py", line 46, in <module>
+    from ._internal.exporter import (  # usort:skip. needs to be last to avoid circular import
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torch/onnx/_internal/exporter.py", line 44, in <module>
+    from torch.onnx._internal.fx import (
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torch/onnx/_internal/fx/__init__.py", line 1, in <module>
+    from .patcher import ONNXTorchPatcher
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torch/onnx/_internal/fx/patcher.py", line 11, in <module>
+    import transformers  # type: ignore[import]
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/transformers/__init__.py", line 27, in <module>
+    from . import dependency_versions_check
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/transformers/dependency_versions_check.py", line 16, in <module>
+    from .utils.versions import require_version, require_version_core
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/transformers/utils/__init__.py", line 24, in <module>
+    from .auto_docstring import (
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/transformers/utils/auto_docstring.py", line 30, in <module>
+    from .generic import ModelOutput
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/transformers/utils/generic.py", line 55, in <module>
+    from ..model_debugging_utils import model_addition_debugger_context
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/transformers/model_debugging_utils.py", line 30, in <module>
+    from safetensors.torch import save_file
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/safetensors/torch.py", line 439, in <module>
+    torch.uint64: 8,
+  File "/Users/kumar/intelligent-document-extraction/venv_310/lib/python3.10/site-packages/torch/__init__.py", line 1938, in __getattr__
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+AttributeError: module 'torch' has no attribute 'uint64'
+🧪 Testing Flask application creation...
+Transformers disabled to prevent hanging - basic NLP only
+Warning: Tesseract path not found, using system default
+❌ Error testing application: module 'torch' has no attribute 'uint64'

@@ -22,7 +22,7 @@ class AdvancedNLPProcessor:
         self._models_initialized = False
         
         if not TRANSFORMERS_AVAILABLE or not TORCH_AVAILABLE:
-            print("Transformers/Torch libraries not available, advanced NLP features disabled")
+            print("Transformers/Torch libraries not available - advanced NLP features disabled")
             self.device = "cpu"
             return
             

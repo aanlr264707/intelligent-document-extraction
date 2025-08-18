@@ -4,9 +4,14 @@ import json
 import re
 from typing import Dict, List, Any, Optional
 
-# Disable transformers for now to prevent hanging
-TRANSFORMERS_AVAILABLE = False
-print("Transformers disabled to prevent hanging - basic NLP only")
+# Enable transformers for full NLP capabilities
+try:
+    from transformers import pipeline
+    TRANSFORMERS_AVAILABLE = True
+    print("Transformers enabled - full NLP capabilities available")
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    print("Transformers not available - falling back to basic NLP")
 
 class NLPProcessor:
     """Processes natural language extraction requests and interprets user requirements"""
@@ -28,7 +33,8 @@ class NLPProcessor:
     def _initialize_transformers_models(self):
         """Initialize Hugging Face transformer models (lazy loading)"""
         if self._models_initialized or not TRANSFORMERS_AVAILABLE:
-            print("Transformers models disabled - using rule-based NLP only")
+            if not TRANSFORMERS_AVAILABLE:
+                print("Transformers not available - using rule-based NLP only")
             return
             
         self._models_initialized = True
@@ -119,7 +125,10 @@ class NLPProcessor:
         Parse this extraction request:"""
         
         try:
-            response = openai.ChatCompletion.create(
+            from openai import OpenAI
+            client = OpenAI(api_key=openai.api_key)
+            
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": system_prompt},

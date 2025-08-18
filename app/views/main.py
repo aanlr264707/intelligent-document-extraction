@@ -24,8 +24,8 @@ def get_document_processor():
 def get_extraction_engine():
     global _extraction_engine
     if _extraction_engine is None:
-        from app.services.extraction_engine import ExtractionEngine
-        _extraction_engine = ExtractionEngine()
+        from app.services.extraction_engine_enhanced import EnhancedExtractionEngine
+        _extraction_engine = EnhancedExtractionEngine()
     return _extraction_engine
 
 def get_output_generator():
@@ -113,14 +113,21 @@ def view_results(extraction_id):
     document = extraction.document
     
     extracted_data = None
+    legal_analysis = None
+    
     if extraction.extracted_data:
         try:
             extracted_data = json.loads(extraction.extracted_data)
+            
+            # Check if we have new enhanced legal analysis format
+            if extracted_data and 'legal_analysis' in extracted_data:
+                legal_analysis = extracted_data['legal_analysis']
+            
         except json.JSONDecodeError:
             extracted_data = {'error': 'Failed to parse extracted data'}
     
-    legal_analysis = None
-    if extraction.identified_clauses:
+    # Fallback to old legal analysis format if no new format found
+    if not legal_analysis and extraction.identified_clauses:
         try:
             legal_analysis = {
                 'clauses': json.loads(extraction.identified_clauses),

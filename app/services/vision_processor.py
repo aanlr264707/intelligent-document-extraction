@@ -32,9 +32,15 @@ try:
 except ImportError:
     LAYOUTPARSER_AVAILABLE = False
 
-# Temporarily disable CLIP to prevent hanging
-CLIP_AVAILABLE = False
-print("CLIP disabled to prevent hanging - basic vision processing only")
+# CLIP Integration
+try:
+    from transformers import CLIPProcessor, CLIPModel
+    import torch
+    CLIP_AVAILABLE = True
+    print("CLIP successfully imported from transformers")
+except ImportError:
+    CLIP_AVAILABLE = False
+    print("CLIP not available - install transformers and torch")
     
 try:
     import fitz  # PyMuPDF
@@ -73,20 +79,24 @@ class VisionProcessor:
         print("VisionProcessor initialized (models will load on demand)")
     
     def _initialize_clip_model(self):
-        """Lazy initialization of CLIP model"""
+        """Lazy initialization of CLIP model using transformers"""
         if self._clip_initialized:
             return
             
         self._clip_initialized = True
         if CLIP_AVAILABLE:
             try:
-                import clip  # Import locally to avoid reference issues
-                import torch  # Import torch locally when needed
-                clip_model_name = os.getenv('CLIP_MODEL_NAME', 'ViT-B/32')
+                from transformers import CLIPProcessor, CLIPModel
+                import torch
+                
+                clip_model_name = os.getenv('CLIP_MODEL_NAME', 'openai/clip-vit-base-patch32')
                 print(f"Loading CLIP model {clip_model_name}...")
-                self.clip_model, self.clip_preprocess = clip.load(clip_model_name)
+                
+                self.clip_model = CLIPModel.from_pretrained(clip_model_name)
+                self.clip_preprocess = CLIPProcessor.from_pretrained(clip_model_name)
                 self.clip_device = "cuda" if torch.cuda.is_available() else "cpu"
                 self.clip_model = self.clip_model.to(self.clip_device)
+                
                 print(f"CLIP model {clip_model_name} initialized successfully on {self.clip_device}")
             except Exception as e:
                 print(f"Failed to initialize CLIP model: {e}")
@@ -121,20 +131,7 @@ class VisionProcessor:
                 print(f"Failed to initialize layout model: {e}")
         
         self.tesseract_config = '--oem 3 --psm 6'
-        
-        # Only try to initialize CLIP if available
-        if CLIP_AVAILABLE:
-            try:
-                import clip
-                import torch
-                device = "cuda" if torch.cuda.is_available() else "cpu"
-                self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=device)
-                self.clip_device = device
-                print("CLIP model initialized successfully")
-            except Exception as e:
-                print(f"Failed to initialize CLIP: {e}")
-        else:
-            print("CLIP disabled - skipping CLIP initialization")
+        print("VisionProcessor initialization complete")
     
     def analyze_document(self, file_path: str) -> Dict[str, Any]:
         """Perform comprehensive visual analysis of a document"""
@@ -563,24 +560,20 @@ class VisionProcessor:
             return {'error': 'CLIP model not available'}
         
         try:
-            import clip  # Import locally to ensure availability
-            import torch  # Import torch locally when needed
+            import torch
             
-            # Preprocess image for CLIP
+            # Convert numpy array to PIL Image
             pil_image = Image.fromarray(image)
-            image_input = self.clip_preprocess(pil_image).unsqueeze(0).to(self.clip_device)
             
-            # Tokenize text queries
-            text_inputs = clip.tokenize(text_queries).to(self.clip_device)
+            # Process inputs using transformers CLIP
+            inputs = self.clip_preprocess(text=text_queries, images=pil_image, return_tensors="pt", padding=True)
+            inputs = {k: v.to(self.clip_device) for k, v in inputs.items()}
             
-            # Get embeddings
+            # Get model outputs
             with torch.no_grad():
-                image_features = self.clip_model.encode_image(image_input)
-                text_features = self.clip_model.encode_text(text_inputs)
-                
-                # Calculate similarities
-                logits_per_image, logits_per_text = self.clip_model(image_input, text_inputs)
-                probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+                outputs = self.clip_model(**inputs)
+                logits_per_image = outputs.logits_per_image
+                probs = logits_per_image.softmax(dim=1).cpu().numpy()
             
             # Create results
             results = {}
@@ -594,8 +587,7 @@ class VisionProcessor:
                 'query_results': results,
                 'best_match': text_queries[np.argmax(probs[0])],
                 'best_score': float(np.max(probs[0])),
-                'image_embedding_shape': image_features.shape,
-                'text_embedding_shape': text_features.shape
+                'model_type': 'transformers_clip'
             }
             
         except Exception as e:

@@ -16,11 +16,13 @@ class DocumentProcessor:
         'pdf': DocumentType.PDF,
         'doc': DocumentType.WORD,
         'docx': DocumentType.WORD,
+        'txt': DocumentType.OTHER,  # Add text file support
         'png': DocumentType.IMAGE,
         'jpg': DocumentType.IMAGE,
         'jpeg': DocumentType.IMAGE,
         'tiff': DocumentType.IMAGE,
-        'bmp': DocumentType.IMAGE
+        'bmp': DocumentType.IMAGE,
+        'gif': DocumentType.IMAGE  # Add GIF support
     }
     
     def __init__(self, upload_folder='static/uploads'):
@@ -116,10 +118,18 @@ class DocumentProcessor:
                 return self._extract_word_text(document.file_path)
             elif document.document_type == DocumentType.IMAGE:
                 return self._extract_image_text(document.file_path)
+            elif document.document_type == DocumentType.OTHER:
+                # Handle text files
+                return self._extract_text_file(document.file_path)
             else:
                 raise ValueError(f"Unsupported document type: {document.document_type}")
         except Exception as e:
             raise Exception(f"Failed to extract text from document: {str(e)}")
+    
+    def _extract_text_file(self, file_path):
+        """Extract text from plain text file"""
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
     
     def _extract_pdf_text(self, file_path):
         """Extract text from PDF file"""

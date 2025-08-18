@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<document_extraction>
+  <metadata>
+    <timestamp>2025-08-07T07:46:38.812766</timestamp>
+    <format>xml</format>
+    <confidence_score>0.8</confidence_score>
+    <processing_time>10.794989</processing_time>
+  </metadata>
+  <extracted_fields>
+    <field name="effective date">December 08, 2023</field>
+    <field name="party name">Hanishk Cherlamcherla, Krish Patel, &amp; Abhi Ankireddy</field>
+    <field name="contract value">Not available</field>
+    <field name="risk">Not available</field>
+    <field name="rag_insights">The document provides clear information on the effective date and the party names involved in the International Business Plan. However, details on contract value and risk are not explicitly mentioned.</field>
+  </extracted_fields>
+  <legal_analysis>
+    <identified_clauses>[]</identified_clauses>
+    <risk_flags>[]</risk_flags>
+    <document_summary>This appears to be a contractual agreement containing 9 clauses or sections.</document_summary>
+    <reference_materials>{&quot;clause_index&quot;: [], &quot;obligation_summary&quot;: [{&quot;type&quot;: &quot;general&quot;, &quot;count&quot;: 5, &quot;examples&quot;: [&quot;abide by government\nregulations...&quot;, &quot;be unique and not in\nuse...&quot;, &quot;lodge tax returns on\nbusinesses...&quot;]}], &quot;key_terms_glossary&quot;: [{&quot;term&quot;: &quot;intellectual property&quot;, &quot;context&quot;: &quot;ncourages creativity and innovation by\nsupporting intellectual property protection. Contract regulation and purchaser security regulations,\nimplemented by the ACCC, add to a fair and moral commercial center. In addition to serving as a\nframework that fosters trust and st&quot;, &quot;page_reference&quot;: 43}], &quot;page_references&quot;: {}}</reference_materials>
+  </legal_analysis>
+</document_extraction>
