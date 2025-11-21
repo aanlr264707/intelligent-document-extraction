@@ -1,0 +1,9 @@
+# Additional ML packages that might cause conflicts
+# Install these separately after core packages
+torchvision>=0.15.0
+langchain>=0.0.290
+langchain-openai>=0.1.0
+layoutparser>=0.3.0
+paddlepaddle>=3.0.0
+paddleocr>=2.7.0
+chromadb>=0.4.0

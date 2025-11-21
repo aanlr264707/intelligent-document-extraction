@@ -4,17 +4,38 @@ import os
 from app.models.document import Document
 from app.models.extraction_request import ExtractionRequest, ExtractionStatus, OutputFormat
 from app.models.audit_log import AuditLog, AuditAction
-from app.services.document_processor import DocumentProcessor
-from app.services.extraction_engine import ExtractionEngine
-from app.services.output_generator import OutputGenerator
 from app import db
 import json
 
 main_bp = Blueprint('main', __name__)
 
-document_processor = DocumentProcessor()
-extraction_engine = ExtractionEngine()
-output_generator = OutputGenerator()
+# Lazy initialization of services
+_document_processor = None
+_extraction_engine = None
+_output_generator = None
+
+def get_document_processor():
+    global _document_processor
+    if _document_processor is None:
+        from app.services.document_processor import DocumentProcessor
+        _document_processor = DocumentProcessor()
+    return _document_processor
+
+def get_extraction_engine():
+    global _extraction_engine
+    if _extraction_engine is None:
+        from app.services.extraction_engine_enhanced import EnhancedExtractionEngine
+        _extraction_engine = EnhancedExtractionEngine()
+    return _extraction_engine
+
+def get_output_generator():
+    global _output_generator
+    if _output_generator is None:
+        from app.services.output_generator import OutputGenerator
+        # Initialize output generator with correct path
+        output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'outputs')
+        _output_generator = OutputGenerator(output_dir)
+    return _output_generator
 
 @main_bp.route('/')
 def index():
@@ -48,8 +69,8 @@ def upload_document():
                 flash('No file selected', 'error')
                 return redirect(request.url)
             
-            file_info = document_processor.save_uploaded_file(file)
-            document = document_processor.create_document_record(file_info)
+            file_info = get_document_processor().save_uploaded_file(file)
+            document = get_document_processor().create_document_record(file_info)
             
             audit_log = AuditLog(
                 action=AuditAction.DOCUMENT_UPLOAD,
@@ -92,14 +113,21 @@ def view_results(extraction_id):
     document = extraction.document
     
     extracted_data = None
+    legal_analysis = None
+    
     if extraction.extracted_data:
         try:
             extracted_data = json.loads(extraction.extracted_data)
+            
+            # Check if we have new enhanced legal analysis format
+            if extracted_data and 'legal_analysis' in extracted_data:
+                legal_analysis = extracted_data['legal_analysis']
+            
         except json.JSONDecodeError:
             extracted_data = {'error': 'Failed to parse extracted data'}
     
-    legal_analysis = None
-    if extraction.identified_clauses:
+    # Fallback to old legal analysis format if no new format found
+    if not legal_analysis and extraction.identified_clauses:
         try:
             legal_analysis = {
                 'clauses': json.loads(extraction.identified_clauses),
@@ -174,7 +202,7 @@ def download_results(extraction_id, format):
             }
         
         filename_prefix = f"extraction_{extraction.id}_{extraction.document.original_filename.rsplit('.', 1)[0]}"
-        result = output_generator.generate_output(output_data, format, filename_prefix)
+        result = get_output_generator().generate_output(output_data, format, filename_prefix)
         
         if result['success']:
             audit_log = AuditLog(
@@ -230,7 +258,7 @@ def export_audit():
         audit_logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).all()
         audit_data = [log.to_dict() for log in audit_logs]
         
-        result = output_generator.create_audit_export(audit_data)
+        result = get_output_generator().create_audit_export(audit_data)
         
         if result['success']:
             from flask import send_file

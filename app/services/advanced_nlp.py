@@ -19,24 +19,23 @@ class AdvancedNLPProcessor:
         self.ner_pipeline = None
         self.summarizer = None
         self.classifier = None
+        self._models_initialized = False
         
         if not TRANSFORMERS_AVAILABLE or not TORCH_AVAILABLE:
-            print("Transformers/Torch libraries not available, advanced NLP features disabled")
+            print("Transformers/Torch libraries not available - advanced NLP features disabled")
             self.device = "cpu"
             return
             
         self.device = "cuda" if (torch and torch.cuda.is_available()) else "cpu"
-        
-        try:
-            self._load_models()
-            self.models_loaded = True
-            print(f"Advanced NLP models loaded successfully on {self.device}")
-        except Exception as e:
-            print(f"Advanced NLP models failed to load: {e}")
-            self.models_loaded = False
+        print(f"AdvancedNLP initialized (models will load on demand) - device: {self.device}")
     
     def _load_models(self):
-        """Load transformer models"""
+        """Load transformer models (lazy loading)"""
+        if self._models_initialized:
+            return
+            
+        self._models_initialized = True
+        print("Loading Advanced NLP models...")
         try:
             self.ner_pipeline = pipeline(
                 "ner", 
@@ -67,9 +66,16 @@ class AdvancedNLPProcessor:
             print("Classifier pipeline loaded successfully")
         except Exception as e:
             print(f"Failed to load classifier pipeline: {e}")
+        
+        # Mark as loaded
+        self.models_loaded = True
+        print(f"Advanced NLP models loaded successfully on {self.device}")
     
     def extract_entities(self, text: str) -> List[Dict[str, Any]]:
         """Extract named entities using BERT NER"""
+        # Lazy load models
+        self._load_models()
+        
         if not self.models_loaded or not self.ner_pipeline:
             return []
         
@@ -90,7 +96,10 @@ class AdvancedNLPProcessor:
             return []
     
     def summarize_text(self, text: str, max_length: int = 150, min_length: int = 30) -> Optional[str]:
-        """Generate text summary using BART"""
+        """Generate text summary using transformer models"""
+        # Lazy load models
+        self._load_models()
+        
         if not self.models_loaded or not self.summarizer:
             return None
             
@@ -110,7 +119,10 @@ class AdvancedNLPProcessor:
             return None
     
     def classify_sentiment(self, text: str) -> Optional[Dict[str, Any]]:
-        """Classify text sentiment"""
+        """Classify text sentiment using transformer models"""
+        # Lazy load models
+        self._load_models()
+        
         if not self.models_loaded or not self.classifier:
             return None
             

@@ -283,7 +283,7 @@ function pollExtractionStatus(extractionId) {
             if (data.success) {
                 const extraction = data.extraction;
                 
-                if (extraction.status === 'completed') {
+                if (extraction.status === 'completed' || extraction.status === 'flagged') {
                     window.location.href = `/results/${extractionId}`;
                 } else if (extraction.status === 'failed') {
                     alert('Extraction failed: ' + (extraction.error_message || 'Unknown error'));
@@ -309,7 +309,7 @@ function checkStatus(extractionId) {
         if (data.success) {
             const extraction = data.extraction;
             
-            if (extraction.status === 'completed') {
+            if (extraction.status === 'completed' || extraction.status === 'flagged') {
                 window.location.href = `/results/${extractionId}`;
             } else {
                 alert(`Status: ${extraction.status}`);

@@ -16,16 +16,36 @@ class DocumentProcessor:
         'pdf': DocumentType.PDF,
         'doc': DocumentType.WORD,
         'docx': DocumentType.WORD,
+        'txt': DocumentType.OTHER,  # Add text file support
         'png': DocumentType.IMAGE,
         'jpg': DocumentType.IMAGE,
         'jpeg': DocumentType.IMAGE,
         'tiff': DocumentType.IMAGE,
-        'bmp': DocumentType.IMAGE
+        'bmp': DocumentType.IMAGE,
+        'gif': DocumentType.IMAGE  # Add GIF support
     }
     
     def __init__(self, upload_folder='static/uploads'):
         self.upload_folder = upload_folder
         os.makedirs(upload_folder, exist_ok=True)
+    
+    def validate_document(self, file_info):
+        """Validate document file information"""
+        filename = file_info.get('filename', '')
+        content_type = file_info.get('content_type', '')
+        size = file_info.get('size', 0)
+        
+        # Basic validation
+        if not filename:
+            return {'valid': False, 'error': 'No filename provided'}
+        
+        if not self.is_allowed_file(filename):
+            return {'valid': False, 'error': 'File type not allowed'}
+        
+        if size > 50 * 1024 * 1024:  # 50MB limit
+            return {'valid': False, 'error': 'File too large'}
+        
+        return {'valid': True, 'message': 'File validation passed'}
     
     def is_allowed_file(self, filename):
         """Check if file extension is allowed"""
@@ -98,10 +118,18 @@ class DocumentProcessor:
                 return self._extract_word_text(document.file_path)
             elif document.document_type == DocumentType.IMAGE:
                 return self._extract_image_text(document.file_path)
+            elif document.document_type == DocumentType.OTHER:
+                # Handle text files
+                return self._extract_text_file(document.file_path)
             else:
                 raise ValueError(f"Unsupported document type: {document.document_type}")
         except Exception as e:
             raise Exception(f"Failed to extract text from document: {str(e)}")
+    
+    def _extract_text_file(self, file_path):
+        """Extract text from plain text file"""
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
     
     def _extract_pdf_text(self, file_path):
         """Extract text from PDF file"""

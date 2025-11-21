@@ -1,0 +1,44 @@
+{
+  "extraction_metadata": {
+    "timestamp": "2025-08-07T07:46:30.292768",
+    "format": "json"
+  },
+  "extracted_fields": {
+    "effective date": "December 08, 2023",
+    "party name": "Hanishk Cherlamcherla, Krish Patel, & Abhi Ankireddy",
+    "contract value": "Not available",
+    "risk": "Not available",
+    "rag_insights": "The document provides clear information on the effective date and the party names involved in the International Business Plan. However, details on contract value and risk are not explicitly mentioned."
+  },
+  "tables": [],
+  "legal_analysis": {
+    "identified_clauses": [],
+    "risk_flags": [],
+    "document_summary": "This appears to be a contractual agreement containing 9 clauses or sections.",
+    "reference_materials": {
+      "clause_index": [],
+      "obligation_summary": [
+        {
+          "type": "general",
+          "count": 5,
+          "examples": [
+            "abide by government\nregulations...",
+            "be unique and not in\nuse...",
+            "lodge tax returns on\nbusinesses..."
+          ]
+        }
+      ],
+      "key_terms_glossary": [
+        {
+          "term": "intellectual property",
+          "context": "ncourages creativity and innovation by\nsupporting intellectual property protection. Contract regulation and purchaser security regulations,\nimplemented by the ACCC, add to a fair and moral commercial center. In addition to serving as a\nframework that fosters trust and st",
+          "page_reference": 43
+        }
+      ],
+      "page_references": {}
+    }
+  },
+  "confidence_metrics": {
+    "overall_confidence": 0.8
+  }
+}
